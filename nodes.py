@@ -254,7 +254,8 @@ class DownloadAndLoadSAM2Model:
         
         sam2_model = {
             'model': model, 
-            'dtype': dtype
+            'dtype': dtype,
+            'segmentor' : segmentor
             }
 
         return (sam2_model,)
@@ -281,12 +282,13 @@ class Sam2Segmentation:
         offload_device = mm.unet_offload_device()
         model = sam2_model["model"]
         dtype = sam2_model["dtype"]
+        segmentor = sam2_model["segmentor"]
         B, H, W, C = image.shape
 
-        model_input_image_size = model.image_size
-
-        print("Resizing to model input image size: ", model_input_image_size)
-        image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
+        if segmentor == 'video':
+            model_input_image_size = model.image_size
+            print("Resizing to model input image size: ", model_input_image_size)
+            image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
 
         image_np = (image[0].contiguous() * 255).byte().numpy()
 
@@ -308,12 +310,12 @@ class Sam2Segmentation:
                     point_labels=point_labels,
                     multimask_output=True,
                     )
-                
+
                 sorted_ind = np.argsort(scores)[::-1]
-                masks = masks[sorted_ind]
+                masks = masks[sorted_ind][0] #choose only the best result for now
                 scores = scores[sorted_ind]
                 logits = logits[sorted_ind]
-                mask_list.append(masks)
+                mask_list.append(np.expand_dims(masks, axis=0))
 
             else:
                 mask_list = []
@@ -339,7 +341,7 @@ class Sam2Segmentation:
                 for frame_idx, obj_masks in video_segments.items():
                     for out_obj_id, out_mask in obj_masks.items():
                         mask_list.append(out_mask)
-
+        
         out_list = []
         for mask in mask_list:
             mask_tensor = torch.from_numpy(mask)
