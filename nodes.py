@@ -134,8 +134,12 @@ class Sam2Segmentation:
             "required": {
                 "sam2_model": ("SAM2MODEL", ),
                 "image": ("IMAGE", ),
-                "coordinates": ("STRING", {"forceInput": True}),
+                "coordinates_positive": ("STRING", {"forceInput": True}),
+               
                 "keep_model_loaded": ("BOOLEAN", {"default": True}),
+            },
+            "optional": {
+                "coordinates_negative": ("STRING", {"forceInput": True}),
             },
         }
     
@@ -144,7 +148,7 @@ class Sam2Segmentation:
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
-    def segment(self, image, sam2_model, coordinates, keep_model_loaded):
+    def segment(self, image, sam2_model, coordinates_positive, keep_model_loaded, coordinates_negative=None):
         offload_device = mm.unet_offload_device()
         model = sam2_model["model"]
         device = sam2_model["device"]
@@ -159,17 +163,33 @@ class Sam2Segmentation:
 
         image_np = (image[0].contiguous() * 255).byte().numpy()
         try:
-            coordinates = json.loads(coordinates.replace("'", '"'))
-            coordinates = [(coord['x'], coord['y']) for coord in coordinates]
+            coordinates_positive = json.loads(coordinates_positive.replace("'", '"'))
+            coordinates_positive = [(coord['x'], coord['y']) for coord in coordinates_positive]
+            if coordinates_negative is not None:
+                coordinates_negative = json.loads(coordinates_negative.replace("'", '"'))
+                coordinates_negative = [(coord['x'], coord['y']) for coord in coordinates_negative]
         except:
-            coordinates = coordinates
-        print(coordinates)
+            coordinates_positive = coordinates_positive
+            if coordinates_negative is not None:
+                coordinates_negative = coordinates_negative
         
-        point_coords = np.array(coordinates)
-        print("coordinates: ", point_coords)
-        point_labels = [1] * len(point_coords)  # 1 = foreground, 0 = background,all points are foreground for now
-        point_labels = np.array(point_labels)
-        #print("point_labels: ", point_labels)
+        positive_point_coords = np.array(coordinates_positive)
+        positive_point_labels = [1] * len(positive_point_coords)  # 1 = positive
+        positive_point_labels = np.array(positive_point_labels)
+        print("positive coordinates: ", positive_point_coords)
+
+        if coordinates_negative is not None:
+            negative_point_coords = np.array(coordinates_negative)
+            negative_point_labels = [0] * len(negative_point_coords)  # 0 = negative
+            negative_point_labels = np.array(negative_point_labels)
+            print("negative coordinates: ", negative_point_coords)
+
+            # Combine coordinates and labels
+        else:
+            negative_point_coords = np.empty((0, 2))
+            negative_point_labels = np.array([])
+        combined_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=0)
+        combined_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=0)
         
         autocast_condition = not mm.is_device_mps(device)
         mask_list = []
@@ -181,8 +201,8 @@ class Sam2Segmentation:
             if image.shape[0] == 1:
                 model.set_image(image_np) 
                 masks, scores, logits = model.predict(
-                    point_coords=point_coords, 
-                    point_labels=point_labels,
+                    point_coords=combined_coords, 
+                    point_labels=combined_labels,
                     multimask_output=True,
                     )
 

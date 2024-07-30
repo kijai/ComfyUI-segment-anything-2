@@ -1,6 +1,6 @@
 {
-  "last_node_id": 95,
-  "last_link_id": 211,
+  "last_node_id": 101,
+  "last_link_id": 235,
   "nodes": [
     {
       "id": 83,
@@ -42,11 +42,36 @@
       ]
     },
     {
+      "id": 90,
+      "type": "PreviewImage",
+      "pos": [
+        409,
+        -775
+      ],
+      "size": {
+        "0": 568.406494140625,
+        "1": 384.9489440917969
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 200
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
       "id": 66,
       "type": "DownloadAndLoadSAM2Model",
       "pos": [
-        -8,
-        -168
+        -34,
+        -171
       ],
       "size": {
         "0": 351.7801513671875,
@@ -60,7 +85,7 @@
           "name": "sam2_model",
           "type": "SAM2MODEL",
           "links": [
-            179
+            231
           ],
           "shape": 3,
           "slot_index": 0
@@ -74,6 +99,84 @@
         "single_image",
         "cuda",
         "bf16"
+      ]
+    },
+    {
+      "id": 84,
+      "type": "ImageAndMaskPreview",
+      "pos": [
+        958,
+        -293
+      ],
+      "size": {
+        "0": 667.9199829101562,
+        "1": 541.2733154296875
+      },
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 192
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 233,
+          "slot_index": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "composite",
+          "type": "IMAGE",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageAndMaskPreview"
+      },
+      "widgets_values": [
+        1,
+        "255, 0, 0",
+        false
+      ]
+    },
+    {
+      "id": 88,
+      "type": "DownloadAndLoadFlorence2Model",
+      "pos": [
+        -512,
+        -707
+      ],
+      "size": {
+        "0": 315,
+        "1": 106
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "florence2_model",
+          "type": "FL2MODEL",
+          "links": [
+            197
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DownloadAndLoadFlorence2Model"
+      },
+      "widgets_values": [
+        "microsoft/Florence-2-base",
+        "fp16",
+        "sdpa"
       ]
     },
     {
@@ -123,9 +226,10 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            180,
             192,
-            210
+            210,
+            226,
+            232
           ],
           "shape": 3,
           "slot_index": 0
@@ -157,48 +261,15 @@
       ]
     },
     {
-      "id": 88,
-      "type": "DownloadAndLoadFlorence2Model",
-      "pos": [
-        -432,
-        -442
-      ],
-      "size": {
-        "0": 315,
-        "1": 106
-      },
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "florence2_model",
-          "type": "FL2MODEL",
-          "links": [
-            197
-          ],
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "DownloadAndLoadFlorence2Model"
-      },
-      "widgets_values": [
-        "microsoft/Florence-2-base",
-        "fp16",
-        "sdpa"
-      ]
-    },
-    {
-      "id": 90,
+      "id": 99,
       "type": "PreviewImage",
       "pos": [
-        409,
-        -775
+        1044,
+        -744
       ],
       "size": {
-        "0": 568.406494140625,
-        "1": 384.9489440917969
+        "0": 530.9268798828125,
+        "1": 363.34893798828125
       },
       "flags": {},
       "order": 5,
@@ -207,7 +278,7 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 200
+          "link": 226
         }
       ],
       "properties": {
@@ -215,147 +286,11 @@
       }
     },
     {
-      "id": 78,
-      "type": "Sam2Segmentation",
-      "pos": [
-        374,
-        -65
-      ],
-      "size": {
-        "0": 315,
-        "1": 102
-      },
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "sam2_model",
-          "type": "SAM2MODEL",
-          "link": 179
-        },
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 180
-        },
-        {
-          "name": "coordinates",
-          "type": "STRING",
-          "link": 209,
-          "widget": {
-            "name": "coordinates"
-          }
-        }
-      ],
-      "outputs": [
-        {
-          "name": "mask",
-          "type": "MASK",
-          "links": [
-            191
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "Sam2Segmentation"
-      },
-      "widgets_values": [
-        "",
-        true
-      ]
-    },
-    {
-      "id": 84,
-      "type": "ImageAndMaskPreview",
-      "pos": [
-        742,
-        -308
-      ],
-      "size": {
-        "0": 667.9199829101562,
-        "1": 541.2733154296875
-      },
-      "flags": {},
-      "order": 8,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 192
-        },
-        {
-          "name": "mask",
-          "type": "MASK",
-          "link": 191,
-          "slot_index": 1
-        }
-      ],
-      "outputs": [
-        {
-          "name": "composite",
-          "type": "IMAGE",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ImageAndMaskPreview"
-      },
-      "widgets_values": [
-        1,
-        "255, 0, 0",
-        false
-      ]
-    },
-    {
-      "id": 93,
-      "type": "Florence2toCoordinates",
-      "pos": [
-        421,
-        -336
-      ],
-      "size": {
-        "0": 210,
-        "1": 58
-      },
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "data",
-          "type": "JSON",
-          "link": 204
-        }
-      ],
-      "outputs": [
-        {
-          "name": "coordinates",
-          "type": "STRING",
-          "links": [
-            209
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "Florence2toCoordinates"
-      },
-      "widgets_values": [
-        "0"
-      ]
-    },
-    {
       "id": 87,
       "type": "Florence2Run",
       "pos": [
-        -60,
-        -640
+        -85,
+        -796
       ],
       "size": {
         "0": 400,
@@ -405,7 +340,8 @@
           "name": "data",
           "type": "JSON",
           "links": [
-            204
+            204,
+            225
           ],
           "shape": 3,
           "slot_index": 3
@@ -415,7 +351,7 @@
         "Node name for S&R": "Florence2Run"
       },
       "widgets_values": [
-        "door handle",
+        "wheel",
         "caption_to_phrase_grounding",
         true,
         false,
@@ -424,33 +360,151 @@
         true,
         ""
       ]
+    },
+    {
+      "id": 93,
+      "type": "Florence2toCoordinates",
+      "pos": [
+        388,
+        -336
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "data",
+          "type": "JSON",
+          "link": 204
+        }
+      ],
+      "outputs": [
+        {
+          "name": "coordinates",
+          "type": "STRING",
+          "links": [
+            234
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Florence2toCoordinates"
+      },
+      "widgets_values": [
+        "0, 1"
+      ]
+    },
+    {
+      "id": 98,
+      "type": "Florence2toCoordinates",
+      "pos": [
+        392,
+        -231
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "data",
+          "type": "JSON",
+          "link": 225
+        }
+      ],
+      "outputs": [
+        {
+          "name": "coordinates",
+          "type": "STRING",
+          "links": [
+            235
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Florence2toCoordinates"
+      },
+      "widgets_values": [
+        "2"
+      ]
+    },
+    {
+      "id": 101,
+      "type": "Sam2Segmentation",
+      "pos": [
+        437,
+        -89
+      ],
+      "size": [
+        315,
+        126
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "sam2_model",
+          "type": "SAM2MODEL",
+          "link": 231
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 232
+        },
+        {
+          "name": "coordinates_positive",
+          "type": "STRING",
+          "link": 234,
+          "widget": {
+            "name": "coordinates_positive"
+          },
+          "slot_index": 2
+        },
+        {
+          "name": "coordinates_negative",
+          "type": "STRING",
+          "link": 235,
+          "widget": {
+            "name": "coordinates_negative"
+          },
+          "slot_index": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            233
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Sam2Segmentation"
+      },
+      "widgets_values": [
+        "",
+        true,
+        ""
+      ]
     }
   ],
   "links": [
-    [
-      179,
-      66,
-      0,
-      78,
-      0,
-      "SAM2MODEL"
-    ],
-    [
-      180,
-      72,
-      0,
-      78,
-      1,
-      "IMAGE"
-    ],
-    [
-      191,
-      78,
-      0,
-      84,
-      1,
-      "MASK"
-    ],
     [
       192,
       72,
@@ -492,30 +546,78 @@
       "JSON"
     ],
     [
-      209,
-      93,
-      0,
-      78,
-      2,
-      "STRING"
-    ],
-    [
       210,
       72,
       0,
       87,
       0,
       "IMAGE"
+    ],
+    [
+      225,
+      87,
+      3,
+      98,
+      0,
+      "JSON"
+    ],
+    [
+      226,
+      72,
+      0,
+      99,
+      0,
+      "IMAGE"
+    ],
+    [
+      231,
+      66,
+      0,
+      101,
+      0,
+      "SAM2MODEL"
+    ],
+    [
+      232,
+      72,
+      0,
+      101,
+      1,
+      "IMAGE"
+    ],
+    [
+      233,
+      101,
+      0,
+      84,
+      1,
+      "MASK"
+    ],
+    [
+      234,
+      93,
+      0,
+      101,
+      2,
+      "STRING"
+    ],
+    [
+      235,
+      98,
+      0,
+      101,
+      3,
+      "STRING"
     ]
   ],
   "groups": [],
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.7627768444385465,
+      "scale": 0.7627768444385467,
       "offset": [
-        529.3463006213565,
-        900.0054900461229
+        663.0888928776299,
+        959.3311266780172
       ]
     }
   },
