@@ -61,14 +61,17 @@ class DownloadAndLoadSAM2Model:
                             local_dir=download_path,
                             local_dir_use_symlinks=False)
 
-        if "base" in model:  
-            model_cfg_path = os.path.join(script_directory, "sam2_configs", "sam2_hiera_b+.yaml")
-        elif "large" in model:
-            model_cfg_path = os.path.join(script_directory, "sam2_configs", "sam2_hiera_l.yaml")
-        elif "small" in model:
-            model_cfg_path = os.path.join(script_directory, "sam2_configs", "sam2_hiera_s.yaml")
-        elif "tiny" in model:
-            model_cfg_path = os.path.join(script_directory, "sam2_configs", "sam2_hiera_t.yaml")
+        model_mapping = {
+            "base": "sam2_hiera_b+.yaml",
+            "large": "sam2_hiera_l.yaml",
+            "small": "sam2_hiera_s.yaml",
+            "tiny": "sam2_hiera_t.yaml"
+        }
+
+        model_cfg_path = next(
+            (os.path.join(script_directory, "sam2_configs", cfg) for key, cfg in model_mapping.items() if key in model),
+            None
+            )
 
         model =load_model(model_path, model_cfg_path, segmentor, dtype, device)
         
