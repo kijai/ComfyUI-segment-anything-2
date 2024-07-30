@@ -117,11 +117,13 @@ class Florence2toCoordinates:
         for idx in indexes:
             if 0 <= idx < len(data[0]):
                 bbox = data[0][idx]
-                print(f"Processing bbox at index {idx}: {bbox}")
+                #print(f"Processing bbox at index {idx}: {bbox}")
                 min_x, min_y, max_x, max_y = bbox
                 center_x = int((min_x + max_x) / 2)
                 center_y = int((min_y + max_y) / 2)
                 center_points.append({"x": center_x, "y": center_y})
+            else:
+                print(f"Index {idx} is out of range. Skipping.")
                 
         coordinates = json.dumps(center_points)
         print("Coordinates:", coordinates)
@@ -186,8 +188,8 @@ class Sam2Segmentation:
 
             # Combine coordinates and labels
         else:
-            negative_point_coords = np.empty((0, 2))
-            negative_point_labels = np.array([])
+            negative_point_coords = np.empty_like(positive_point_coords)
+            negative_point_labels = np.empty_like(positive_point_labels)
         combined_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=0)
         combined_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=0)
         
