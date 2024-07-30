@@ -84,6 +84,48 @@ class DownloadAndLoadSAM2Model:
             }
 
         return (sam2_model,)
+
+
+class Florence2toCoordinates:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "data": ("JSON", ),
+                "index": ("STRING", {"default": "0"}),
+            },
+        }
+    
+    RETURN_TYPES = ("STRING", )
+    RETURN_NAMES =("coordinates", )
+    FUNCTION = "segment"
+    CATEGORY = "SAM2"
+
+    def segment(self, data, index):
+        try:
+            coordinates = coordinates.replace("'", '"')
+            coordinates = json.loads(coordinates)
+        except:
+            coordinates = data
+        print("Type of data:", type(data))
+        print("Data:", data)
+        
+        center_points = []
+        indexes = [int(i) for i in index.split(",")]
+        print("Indexes:", indexes)
+        
+        for idx in indexes:
+            if 0 <= idx < len(data[0]):
+                bbox = data[0][idx]
+                print(f"Processing bbox at index {idx}: {bbox}")
+                min_x, min_y, max_x, max_y = bbox
+                center_x = int((min_x + max_x) / 2)
+                center_y = int((min_y + max_y) / 2)
+                center_points.append({"x": center_x, "y": center_y})
+                
+        coordinates = json.dumps(center_points)
+        print("Coordinates:", coordinates)
+        return (coordinates,)
     
 class Sam2Segmentation:
     @classmethod
@@ -116,9 +158,13 @@ class Sam2Segmentation:
             image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
 
         image_np = (image[0].contiguous() * 255).byte().numpy()
-
-        coordinates = json.loads(coordinates.replace("'", '"'))
-        coordinates = [(coord['x'], coord['y']) for coord in coordinates]
+        try:
+            coordinates = json.loads(coordinates.replace("'", '"'))
+            coordinates = [(coord['x'], coord['y']) for coord in coordinates]
+        except:
+            coordinates = coordinates
+        print(coordinates)
+        
         point_coords = np.array(coordinates)
         print("coordinates: ", point_coords)
         point_labels = [1] * len(point_coords)  # 1 = foreground, 0 = background,all points are foreground for now
@@ -191,8 +237,10 @@ class Sam2Segmentation:
 NODE_CLASS_MAPPINGS = {
     "DownloadAndLoadSAM2Model": DownloadAndLoadSAM2Model,
     "Sam2Segmentation": Sam2Segmentation,
+    "Florence2toCoordinates": Florence2toCoordinates
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadSAM2Model": "(Down)Load SAM2Model",
     "Sam2Segmentation": "Sam2Segmentation",
+    "Florence2toCoordinates": "Florence2 Coordinates"
 }
