@@ -208,7 +208,7 @@ class DownloadAndLoadSAM2Model:
             "dynamic_multimask_stability_thresh": 0.98,
         }
 
-        def initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, sd, dtype, device):
+        def initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, dtype, device):
             return model_class(
                 image_encoder=image_encoder,
                 memory_attention=memory_attention,
@@ -244,12 +244,12 @@ class DownloadAndLoadSAM2Model:
         # Initialize model based on segmentor type
         if segmentor == 'single_image':
             model_class = SAM2Base
-            model = initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, sd, dtype, device)
+            model = initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, dtype, device)
             model.load_state_dict(sd)
             model = SAM2ImagePredictor(model)
         elif segmentor == 'video':
             model_class = SAM2VideoPredictor
-            model = initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, sd, dtype, device)
+            model = initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, dtype, device)
             model.load_state_dict(sd)
         
         sam2_model = {
@@ -268,7 +268,7 @@ class Sam2Segmentation:
                 "sam2_model": ("SAM2MODEL", ),
                 "image": ("IMAGE", ),
                 "coordinates": ("STRING", {"forceInput": True}),
-                "keep_model_loaded": ("BOOLEAN", {"default": False}),
+                "keep_model_loaded": ("BOOLEAN", {"default": True}),
             },
         }
     
@@ -285,7 +285,7 @@ class Sam2Segmentation:
         segmentor = sam2_model["segmentor"]
         B, H, W, C = image.shape
 
-        if segmentor == 'video':
+        if segmentor == 'video': # video model needs images resized first thing
             model_input_image_size = model.image_size
             print("Resizing to model input image size: ", model_input_image_size)
             image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
@@ -296,12 +296,16 @@ class Sam2Segmentation:
         coordinates = [(coord['x'], coord['y']) for coord in coordinates]
         point_coords = np.array(coordinates)
         print("coordinates: ", point_coords)
-        point_labels = [1] * len(point_coords)
+        point_labels = [1] * len(point_coords)  # 1 = foreground, 0 = background,all points are foreground for now
         point_labels = np.array(point_labels)
-        print("point_labels: ", point_labels)
+        #print("point_labels: ", point_labels)
         
         autocast_condition = not mm.is_device_mps(device)
         mask_list = []
+        try:
+            model.to(device)
+        except:
+            model.model.to(device)
         with torch.autocast(mm.get_autocast_device(model.device), dtype=dtype) if autocast_condition else nullcontext():
             if image.shape[0] == 1:
                 model.set_image(image_np) 
@@ -341,6 +345,12 @@ class Sam2Segmentation:
                 for frame_idx, obj_masks in video_segments.items():
                     for out_obj_id, out_mask in obj_masks.items():
                         mask_list.append(out_mask)
+
+        if not keep_model_loaded:
+            try:
+                model.to(offload_device)
+            except:
+                model.model.to(offload_device)
         
         out_list = []
         for mask in mask_list:
