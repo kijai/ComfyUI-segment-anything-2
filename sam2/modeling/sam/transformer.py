@@ -317,12 +317,14 @@ class RoPEAttention(Attention):
 
         dropout_p = self.dropout_p if self.training else 0.0
         # Attention
-        with torch.backends.cuda.sdp_kernel(
-            enable_flash=USE_FLASH_ATTN,
-            # if Flash attention kernel is off, then math kernel needs to be enabled
-            enable_math=(OLD_GPU and dropout_p > 0.0) or MATH_KERNEL_ON,
-            enable_mem_efficient=OLD_GPU,
-        ):
+        backends = [SDPBackend.MATH, SDPBackend.EFFICIENT_ATTENTION]
+        if USE_FLASH_ATTN:
+            backends.append(SDPBackend.FLASH_ATTENTION)
+        if OLD_GPU and dropout_p > 0.0:
+            backends.append(SDPBackend.MATH)
+        if OLD_GPU:
+            backends.append(SDPBackend.MEM_EFFICIENT_ATTENTION)
+        with sdpa_kernel(backends):
             out = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout_p)
 
         out = self._recombine_heads(out)

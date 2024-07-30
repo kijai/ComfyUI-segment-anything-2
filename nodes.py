@@ -15,9 +15,10 @@ from .sam2.modeling.memory_encoder import MemoryEncoder, MaskDownSampler, Fuser,
 from contextlib import nullcontext
 
 from .sam2.sam2_image_predictor import SAM2ImagePredictor
+from .sam2.sam2_video_predictor import SAM2VideoPredictor
 
 import comfy.model_management as mm
-from comfy.utils import ProgressBar, load_torch_file
+from comfy.utils import ProgressBar, load_torch_file, common_upscale
 import folder_paths
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -26,25 +27,19 @@ class DownloadAndLoadSAM2Model:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-            "model": (
-                    [ 
+            "model": ([ 
                     'sam2_hiera_base_plus.safetensors',
-                    #'sam2_hiera_large.pt',
-                    ],
-                    {
-                    "default": 'sam2_hiera_base_plus.safetensors'
-                    }),
-            "device": (
-                    [ 
-                    'cuda',
-                    'cpu',
-                    ],
-                    {
-                    "default": 'cpu'
-                    }),
+                    'sam2_hiera_large.safetensors',
+                    'sam2_hiera_small.safetensors',
+                    'sam2_hiera_tiny.safetensors',
+                    ],),
+            "segmentor": (
+                    ['single_image','video',],
+                    ),
+            "device": (['cuda', 'cpu',], ),
             "precision": ([ 'fp16','bf16','fp32'],
                     {
-                    "default": 'fp16'
+                    "default": 'bf16'
                     }),
 
             },
@@ -55,7 +50,7 @@ class DownloadAndLoadSAM2Model:
     FUNCTION = "loadmodel"
     CATEGORY = "SAM2"
 
-    def loadmodel(self, model, device, precision):
+    def loadmodel(self, model, segmentor, device, precision):
         #device = mm.get_torch_device()
         #offload_device = mm.unet_offload_device()
         if device == "cuda":
@@ -114,7 +109,11 @@ class DownloadAndLoadSAM2Model:
 
         trunk = Hiera(
             embed_dim=trunk_config['embed_dim'],
-            num_heads=trunk_config['num_heads']
+            num_heads=trunk_config['num_heads'],
+            stages=trunk_config['stages'],
+            global_att_blocks=trunk_config['global_att_blocks'],
+            window_pos_embed_bkg_spatial_size=trunk_config['window_pos_embed_bkg_spatial_size']
+
         )
 
         image_encoder = ImageEncoder(
@@ -209,42 +208,49 @@ class DownloadAndLoadSAM2Model:
             "dynamic_multimask_stability_thresh": 0.98,
         }
 
-        base_model = SAM2Base(
-            image_encoder=image_encoder,
-            memory_attention=memory_attention,
-            memory_encoder=memory_encoder,
-            sam_mask_decoder_extra_args=sam_mask_decoder_extra_args,
-            num_maskmem=model_config['num_maskmem'],
-            image_size=model_config['image_size'],
-            sigmoid_scale_for_mem_enc=model_config['sigmoid_scale_for_mem_enc'],
-            sigmoid_bias_for_mem_enc=model_config['sigmoid_bias_for_mem_enc'],
-            use_mask_input_as_output_without_sam=model_config['use_mask_input_as_output_without_sam'],
-            directly_add_no_mem_embed=model_config['directly_add_no_mem_embed'],
-            use_high_res_features_in_sam=model_config['use_high_res_features_in_sam'],
-            multimask_output_in_sam=model_config['multimask_output_in_sam'],
-            iou_prediction_use_sigmoid=model_config['iou_prediction_use_sigmoid'],
-            use_obj_ptrs_in_encoder=model_config['use_obj_ptrs_in_encoder'],
-            add_tpos_enc_to_obj_ptrs=model_config['add_tpos_enc_to_obj_ptrs'],
-            only_obj_ptrs_in_the_past_for_eval=model_config['only_obj_ptrs_in_the_past_for_eval'],
-            pred_obj_scores=model_config['pred_obj_scores'],
-            pred_obj_scores_mlp=model_config['pred_obj_scores_mlp'],
-            fixed_no_obj_ptr=model_config['fixed_no_obj_ptr'],
-            multimask_output_for_tracking=model_config['multimask_output_for_tracking'],
-            use_multimask_token_for_obj_ptr=model_config['use_multimask_token_for_obj_ptr'],
-            compile_image_encoder = model_config['compile_image_encoder'],
-            multimask_min_pt_num = model_config['multimask_min_pt_num'],
-            multimask_max_pt_num = model_config['multimask_max_pt_num'],
-            use_mlp_for_obj_ptr_proj = model_config['use_mlp_for_obj_ptr_proj'],
+        def initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, sd, dtype, device):
+            return model_class(
+                image_encoder=image_encoder,
+                memory_attention=memory_attention,
+                memory_encoder=memory_encoder,
+                sam_mask_decoder_extra_args=sam_mask_decoder_extra_args,
+                num_maskmem=model_config['num_maskmem'],
+                image_size=model_config['image_size'],
+                sigmoid_scale_for_mem_enc=model_config['sigmoid_scale_for_mem_enc'],
+                sigmoid_bias_for_mem_enc=model_config['sigmoid_bias_for_mem_enc'],
+                use_mask_input_as_output_without_sam=model_config['use_mask_input_as_output_without_sam'],
+                directly_add_no_mem_embed=model_config['directly_add_no_mem_embed'],
+                use_high_res_features_in_sam=model_config['use_high_res_features_in_sam'],
+                multimask_output_in_sam=model_config['multimask_output_in_sam'],
+                iou_prediction_use_sigmoid=model_config['iou_prediction_use_sigmoid'],
+                use_obj_ptrs_in_encoder=model_config['use_obj_ptrs_in_encoder'],
+                add_tpos_enc_to_obj_ptrs=model_config['add_tpos_enc_to_obj_ptrs'],
+                only_obj_ptrs_in_the_past_for_eval=model_config['only_obj_ptrs_in_the_past_for_eval'],
+                pred_obj_scores=model_config['pred_obj_scores'],
+                pred_obj_scores_mlp=model_config['pred_obj_scores_mlp'],
+                fixed_no_obj_ptr=model_config['fixed_no_obj_ptr'],
+                multimask_output_for_tracking=model_config['multimask_output_for_tracking'],
+                use_multimask_token_for_obj_ptr=model_config['use_multimask_token_for_obj_ptr'],
+                compile_image_encoder=model_config['compile_image_encoder'],
+                multimask_min_pt_num=model_config['multimask_min_pt_num'],
+                multimask_max_pt_num=model_config['multimask_max_pt_num'],
+                use_mlp_for_obj_ptr_proj=model_config['use_mlp_for_obj_ptr_proj'],
+                binarize_mask_from_pts_for_mem_enc=True if segmentor == 'video' else False,
+            ).to(dtype).to(device).eval()
 
-        ).to(dtype).to(device)
-        
-        #print(base_model)
+        # Load the state dictionary
         sd = load_torch_file(model_path)
-        #for key in sd['model']:
-        #    print(key)
-        base_model.load_state_dict(sd)
-            
-        model = SAM2ImagePredictor(base_model)
+
+        # Initialize model based on segmentor type
+        if segmentor == 'single_image':
+            model_class = SAM2Base
+            model = initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, sd, dtype, device)
+            model.load_state_dict(sd)
+            model = SAM2ImagePredictor(model)
+        elif segmentor == 'video':
+            model_class = SAM2VideoPredictor
+            model = initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, sd, dtype, device)
+            model.load_state_dict(sd)
         
         sam2_model = {
             'model': model, 
@@ -261,7 +267,6 @@ class Sam2Segmentation:
                 "sam2_model": ("SAM2MODEL", ),
                 "image": ("IMAGE", ),
                 "coordinates": ("STRING", {"forceInput": True}),
-                "point_labels": ("INT", {"default": 0}),
                 "keep_model_loaded": ("BOOLEAN", {"default": False}),
             },
         }
@@ -271,46 +276,79 @@ class Sam2Segmentation:
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
-    def segment(self, image, sam2_model, coordinates, keep_model_loaded, point_labels):
+    def segment(self, image, sam2_model, coordinates, keep_model_loaded):
         device = mm.get_torch_device()
         offload_device = mm.unet_offload_device()
         model = sam2_model["model"]
         dtype = sam2_model["dtype"]
+        B, H, W, C = image.shape
+
+        model_input_image_size = model.image_size
+
+        print("Resizing to model input image size: ", model_input_image_size)
+        image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
 
         image_np = (image[0].contiguous() * 255).byte().numpy()
 
         coordinates = json.loads(coordinates.replace("'", '"'))
         coordinates = [(coord['x'], coord['y']) for coord in coordinates]
-        point_coords = np.array([coordinates[0]])
-        print(point_coords)
-        point_labels = np.array([point_labels])
+        point_coords = np.array(coordinates)
+        print("coordinates: ", point_coords)
+        point_labels = [1] * len(point_coords)
+        point_labels = np.array(point_labels)
+        print("point_labels: ", point_labels)
         
         autocast_condition = not mm.is_device_mps(device)
-        
+        mask_list = []
         with torch.autocast(mm.get_autocast_device(model.device), dtype=dtype) if autocast_condition else nullcontext():
-            model.set_image(image_np)
-            print(model._features["image_embed"].shape, model._features["image_embed"][-1].shape)
-            masks, scores, logits = model.predict(
-                point_coords=point_coords, 
-                point_labels=point_labels,
-                multimask_output=True,
+            if image.shape[0] == 1:
+                model.set_image(image_np) 
+                masks, scores, logits = model.predict(
+                    point_coords=point_coords, 
+                    point_labels=point_labels,
+                    multimask_output=True,
+                    )
+                
+                sorted_ind = np.argsort(scores)[::-1]
+                masks = masks[sorted_ind]
+                scores = scores[sorted_ind]
+                logits = logits[sorted_ind]
+                mask_list.append(masks)
+
+            else:
+                mask_list = []
+                if hasattr(self, 'inference_state'):
+                    model.reset_state(self.inference_state)
+                self.inference_state = model.init_state(image.permute(0, 3, 1, 2).contiguous(), H, W)
+
+                _, out_obj_ids, out_mask_logits = model.add_new_points(
+                    inference_state=self.inference_state,
+                    frame_idx=0,
+                    obj_id=1,
+                    points=point_coords,
+                    labels=point_labels,
                 )
+                pbar = ProgressBar(B)
+                video_segments = {}
+                for out_frame_idx, out_obj_ids, out_mask_logits in model.propagate_in_video(self.inference_state):
+                    video_segments[out_frame_idx] = {
+                        out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+                        for i, out_obj_id in enumerate(out_obj_ids)
+                        }
+                    pbar.update(1)
+                for frame_idx, obj_masks in video_segments.items():
+                    for out_obj_id, out_mask in obj_masks.items():
+                        mask_list.append(out_mask)
 
-        sorted_ind = np.argsort(scores)[::-1]
-        masks = masks[sorted_ind]
-        scores = scores[sorted_ind]
-        logits = logits[sorted_ind]
-
-        print(type(masks))
-        print(masks.shape)
-        print(masks.min(), masks.max())
-        mask_tensor = torch.from_numpy(masks)
-        mask_tensor = mask_tensor.unsqueeze(0).permute(0, 2, 3, 1).cpu().float()
-        mask_tensor = mask_tensor.mean(dim=0, keepdim=True)
-        mask_tensor = mask_tensor.repeat(1, 1, 1, 3)
-        mask_tensor = mask_tensor[:, :, :, 0]
-        print(mask_tensor.shape)
-        print(mask_tensor.min(), mask_tensor.max())
+        out_list = []
+        for mask in mask_list:
+            mask_tensor = torch.from_numpy(mask)
+            mask_tensor = mask_tensor.permute(1, 2, 0).cpu().float()
+            mask_tensor = mask_tensor.mean(dim=-1, keepdim=True)
+            mask_tensor = mask_tensor.repeat(1, 1, 3)
+            mask_tensor = mask_tensor[:, :, 0]
+            out_list.append(mask_tensor)
+        mask_tensor = torch.stack(out_list, dim=0)
         return (mask_tensor,)
      
 NODE_CLASS_MAPPINGS = {
