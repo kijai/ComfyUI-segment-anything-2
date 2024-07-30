@@ -222,8 +222,8 @@ class Sam2Segmentation:
                     inference_state=self.inference_state,
                     frame_idx=0,
                     obj_id=1,
-                    points=point_coords,
-                    labels=point_labels,
+                    points=combined_coords,
+                    labels=combined_labels,
                 )
                 pbar = ProgressBar(B)
                 video_segments = {}
