@@ -3,6 +3,7 @@ import torch
 import os
 import numpy as np
 import yaml
+import json
 from .sam2.modeling.sam2_base import SAM2Base
 from .sam2.modeling.backbones.image_encoder import ImageEncoder
 from .sam2.modeling.backbones.hieradet import Hiera
@@ -27,7 +28,7 @@ class DownloadAndLoadSAM2Model:
         return {"required": {
             "model": (
                     [ 
-                    'Kijai/sam2_hiera_base_plus.safetensors',
+                    'sam2_hiera_base_plus.safetensors',
                     #'sam2_hiera_large.pt',
                     ],
                     {
@@ -64,14 +65,15 @@ class DownloadAndLoadSAM2Model:
                 torch.backends.cudnn.allow_tf32 = True
         dtype = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[precision]
 
-        model_name = model.rsplit('/', 1)[-1]
-        model_path = os.path.join(folder_paths.models_dir, "sam2", model_name)
+        download_path = os.path.join(folder_paths.models_dir, "sam2")
+        model_path = os.path.join(download_path, model)
         
         if not os.path.exists(model_path):
             print(f"Downloading SAM2 model to: {model_path}")
             from huggingface_hub import snapshot_download
-            snapshot_download(repo_id=model,
-                            local_dir=model_path,
+            snapshot_download(repo_id="Kijai/sam2-safetensors",
+                            allow_patterns=[f"*{model}*"],
+                            local_dir=download_path,
                             local_dir_use_symlinks=False)
 
         if "base" in model:  
@@ -235,12 +237,12 @@ class DownloadAndLoadSAM2Model:
             use_mlp_for_obj_ptr_proj = model_config['use_mlp_for_obj_ptr_proj'],
 
         ).to(dtype).to(device)
-        #base_model.sam_mask_decoder.to('cpu')
+        
         #print(base_model)
         sd = load_torch_file(model_path)
         #for key in sd['model']:
         #    print(key)
-        base_model.load_state_dict(sd['model'])
+        base_model.load_state_dict(sd)
             
         model = SAM2ImagePredictor(base_model)
         
@@ -258,8 +260,7 @@ class Sam2Segmentation:
             "required": {
                 "sam2_model": ("SAM2MODEL", ),
                 "image": ("IMAGE", ),
-                "x": ("INT", {"default": 0}),
-                "y": ("INT", {"default": 0}),
+                "coordinates": ("STRING", {"forceInput": True}),
                 "point_labels": ("INT", {"default": 0}),
                 "keep_model_loaded": ("BOOLEAN", {"default": False}),
             },
@@ -270,18 +271,21 @@ class Sam2Segmentation:
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
-    def segment(self, image, sam2_model, x, y, keep_model_loaded, point_labels):
+    def segment(self, image, sam2_model, coordinates, keep_model_loaded, point_labels):
         device = mm.get_torch_device()
         offload_device = mm.unet_offload_device()
         model = sam2_model["model"]
         dtype = sam2_model["dtype"]
 
         image_np = (image[0].contiguous() * 255).byte().numpy()
-        point_coords = np.array([[x, y]])
+
+        coordinates = json.loads(coordinates.replace("'", '"'))
+        coordinates = [(coord['x'], coord['y']) for coord in coordinates]
+        point_coords = np.array(coordinates)
         point_labels = np.array([point_labels])
         
         autocast_condition = not mm.is_device_mps(device)
-        print(autocast_condition)
+        
         with torch.autocast(mm.get_autocast_device(model.device), dtype=dtype) if autocast_condition else nullcontext():
             model.set_image(image_np)
             print(model._features["image_embed"].shape, model._features["image_embed"][-1].shape)
