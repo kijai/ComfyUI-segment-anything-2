@@ -26,7 +26,7 @@ class DownloadAndLoadSAM2Model:
             "segmentor": (
                     ['single_image','video',],
                     ),
-            "device": (['cuda', 'cpu',], ),
+            "device": (['cuda', 'cpu', 'mps'], ),
             "precision": ([ 'fp16','bf16','fp32'],
                     {
                     "default": 'bf16'
@@ -41,8 +41,9 @@ class DownloadAndLoadSAM2Model:
     CATEGORY = "SAM2"
 
     def loadmodel(self, model, segmentor, device, precision):
-        #device = mm.get_torch_device()
-        #offload_device = mm.unet_offload_device()
+        if precision != 'fp32' and device == 'cpu':
+            raise ValueError("fp16 and bf16 are not supported on cpu")
+
         if device == "cuda":
             if torch.cuda.get_device_properties(0).major >= 8:
                 # turn on tfloat32 for Ampere GPUs (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
@@ -78,6 +79,7 @@ class DownloadAndLoadSAM2Model:
         sam2_model = {
             'model': model, 
             'dtype': dtype,
+            'device': device,
             'segmentor' : segmentor
             }
 
@@ -101,9 +103,9 @@ class Sam2Segmentation:
     CATEGORY = "SAM2"
 
     def segment(self, image, sam2_model, coordinates, keep_model_loaded):
-        device = mm.get_torch_device()
         offload_device = mm.unet_offload_device()
         model = sam2_model["model"]
+        device = sam2_model["device"]
         dtype = sam2_model["dtype"]
         segmentor = sam2_model["segmentor"]
         B, H, W, C = image.shape
