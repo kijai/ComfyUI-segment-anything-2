@@ -188,8 +188,16 @@ class Sam2Segmentation:
 
             # Combine coordinates and labels
         else:
-            negative_point_coords = np.empty_like(positive_point_coords)
-            negative_point_labels = np.empty_like(positive_point_labels)
+            negative_point_coords = np.empty((0, 2))
+            negative_point_labels = np.array([])
+        # Ensure both positive and negative coordinates are 2D arrays
+        positive_point_coords = np.atleast_2d(positive_point_coords)
+        negative_point_coords = np.atleast_2d(negative_point_coords)
+
+        # Ensure both positive and negative labels are 1D arrays
+        positive_point_labels = np.atleast_1d(positive_point_labels)
+        negative_point_labels = np.atleast_1d(negative_point_labels)
+
         combined_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=0)
         combined_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=0)
         
