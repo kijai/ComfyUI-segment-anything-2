@@ -278,8 +278,7 @@ class Sam2Segmentation:
         dtype = sam2_model["dtype"]
 
         image_np = (image[0].contiguous() * 255).byte().numpy()
-        test_coords = np.array([[500, 375]])
-        print(test_coords)
+
         coordinates = json.loads(coordinates.replace("'", '"'))
         coordinates = [(coord['x'], coord['y']) for coord in coordinates]
         point_coords = np.array([coordinates[0]])
