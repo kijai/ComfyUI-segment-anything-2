@@ -9,7 +9,7 @@ For testing only currently.
 
 Functional, but needs better coordinate selector. 
 
-For now mask postprocessing is disabled due to it needing cuda extension compilation.
+For now mask postprocessing is disabled due to it needing cuda extension compilation. We can use other nodes for this purpose anyway, so might leave it that way, we'll see.
 
 Models are automatically downloade from https://huggingface.co/Kijai/sam2-safetensors/tree/main
 
