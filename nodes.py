@@ -278,10 +278,12 @@ class Sam2Segmentation:
         dtype = sam2_model["dtype"]
 
         image_np = (image[0].contiguous() * 255).byte().numpy()
-
+        test_coords = np.array([[500, 375]])
+        print(test_coords)
         coordinates = json.loads(coordinates.replace("'", '"'))
         coordinates = [(coord['x'], coord['y']) for coord in coordinates]
-        point_coords = np.array(coordinates)
+        point_coords = np.array([coordinates[0]])
+        print(point_coords)
         point_labels = np.array([point_labels])
         
         autocast_condition = not mm.is_device_mps(device)
