@@ -1,61 +1,27 @@
 {
-  "last_node_id": 77,
-  "last_link_id": 178,
+  "last_node_id": 96,
+  "last_link_id": 213,
   "nodes": [
     {
-      "id": 66,
-      "type": "DownloadAndLoadSAM2Model",
-      "pos": [
-        281,
-        -115
-      ],
-      "size": {
-        "0": 351.7801513671875,
-        "1": 106
-      },
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "sam2_model",
-          "type": "SAM2MODEL",
-          "links": [
-            171
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "DownloadAndLoadSAM2Model"
-      },
-      "widgets_values": [
-        "sam2_hiera_base_plus.safetensors",
-        "cuda",
-        "bf16"
-      ]
-    },
-    {
-      "id": 1,
+      "id": 83,
       "type": "LoadImage",
       "pos": [
-        283,
-        191
+        -6,
+        40
       ],
       "size": {
         "0": 315,
         "1": 314
       },
       "flags": {},
-      "order": 1,
+      "order": 0,
       "mode": 0,
       "outputs": [
         {
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            166
+            196
           ],
           "shape": 3,
           "slot_index": 0
@@ -63,9 +29,8 @@
         {
           "name": "MASK",
           "type": "MASK",
-          "links": [],
-          "shape": 3,
-          "slot_index": 1
+          "links": null,
+          "shape": 3
         }
       ],
       "properties": {
@@ -77,66 +42,46 @@
       ]
     },
     {
-      "id": 74,
-      "type": "Sam2Segmentation",
+      "id": 66,
+      "type": "DownloadAndLoadSAM2Model",
       "pos": [
-        1076,
-        298
+        -8,
+        -168
       ],
       "size": {
-        "0": 315,
-        "1": 126
+        "0": 351.7801513671875,
+        "1": 130
       },
       "flags": {},
-      "order": 4,
+      "order": 1,
       "mode": 0,
-      "inputs": [
+      "outputs": [
         {
           "name": "sam2_model",
           "type": "SAM2MODEL",
-          "link": 171
-        },
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 178
-        },
-        {
-          "name": "coordinates",
-          "type": "STRING",
-          "link": 174,
-          "widget": {
-            "name": "coordinates"
-          },
-          "slot_index": 2
-        }
-      ],
-      "outputs": [
-        {
-          "name": "mask",
-          "type": "MASK",
           "links": [
-            173
+            179
           ],
           "shape": 3,
           "slot_index": 0
         }
       ],
       "properties": {
-        "Node name for S&R": "Sam2Segmentation"
+        "Node name for S&R": "DownloadAndLoadSAM2Model"
       },
       "widgets_values": [
-        "",
-        1,
-        false
+        "sam2_hiera_small.safetensors",
+        "single_image",
+        "cuda",
+        "bf16"
       ]
     },
     {
       "id": 72,
       "type": "ImageResizeKJ",
       "pos": [
-        656,
-        298
+        353,
+        127
       ],
       "size": {
         "0": 315,
@@ -149,7 +94,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 166
+          "link": 196
         },
         {
           "name": "get_image_size",
@@ -178,8 +123,8 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            177,
-            178
+            180,
+            192
           ],
           "shape": 3,
           "slot_index": 0
@@ -211,15 +156,68 @@
       ]
     },
     {
-      "id": 71,
-      "type": "ImageAndMaskPreview",
+      "id": 78,
+      "type": "Sam2Segmentation",
       "pos": [
-        1625,
+        374,
         -65
       ],
       "size": {
-        "0": 493.91461181640625,
-        "1": 498.041259765625
+        "0": 315,
+        "1": 102
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "sam2_model",
+          "type": "SAM2MODEL",
+          "link": 179
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 180
+        },
+        {
+          "name": "coordinates",
+          "type": "STRING",
+          "link": 213,
+          "widget": {
+            "name": "coordinates"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            191
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Sam2Segmentation"
+      },
+      "widgets_values": [
+        "",
+        true
+      ]
+    },
+    {
+      "id": 84,
+      "type": "ImageAndMaskPreview",
+      "pos": [
+        742,
+        -308
+      ],
+      "size": {
+        "0": 667.9199829101562,
+        "1": 541.2733154296875
       },
       "flags": {},
       "order": 5,
@@ -228,12 +226,13 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 177
+          "link": 192
         },
         {
           "name": "mask",
           "type": "MASK",
-          "link": 173
+          "link": 191,
+          "slot_index": 1
         }
       ],
       "outputs": [
@@ -254,11 +253,11 @@
       ]
     },
     {
-      "id": 75,
+      "id": 96,
       "type": "SplineEditor",
       "pos": [
-        792,
-        -821
+        -138,
+        -1183
       ],
       "size": [
         813,
@@ -278,7 +277,7 @@
           "name": "coord_str",
           "type": "STRING",
           "links": [
-            174
+            213
           ],
           "shape": 3,
           "slot_index": 1
@@ -307,11 +306,11 @@
         "points": "SplineEditor"
       },
       "widgets_values": [
-        "[{\"x\":360.7010000000001,\"y\":236.91800000000003},{\"x\":495,\"y\":385}]",
-        "[{\"x\":360.70098876953125,\"y\":236.91799926757812},{\"x\":495,\"y\":385}]",
+        "[{\"x\":220.24790241719901,\"y\":308.0848635002486},{\"x\":309.3958629193986,\"y\":309.3958629193986}]",
+        "[{\"x\":220.24790954589844,\"y\":308.0848693847656},{\"x\":226.19110107421875,\"y\":308.1722717285156},{\"x\":232.13430786132812,\"y\":308.2596740722656},{\"x\":238.0775146484375,\"y\":308.3470764160156},{\"x\":244.0207061767578,\"y\":308.4344787597656},{\"x\":249.96389770507812,\"y\":308.5218811035156},{\"x\":255.9071044921875,\"y\":308.6092834472656},{\"x\":261.85028076171875,\"y\":308.6966857910156},{\"x\":267.7934875488281,\"y\":308.7840576171875},{\"x\":273.7366943359375,\"y\":308.8714599609375},{\"x\":279.6799011230469,\"y\":308.9588623046875},{\"x\":285.6230773925781,\"y\":309.0462646484375},{\"x\":291.5662841796875,\"y\":309.1336669921875},{\"x\":297.5094909667969,\"y\":309.2210693359375},{\"x\":303.4526672363281,\"y\":309.3084716796875},{\"x\":309.3958740234375,\"y\":309.3958740234375}]",
         768,
         512,
-        2,
+        16,
         "path",
         "cardinal",
         0.5,
@@ -326,62 +325,62 @@
   ],
   "links": [
     [
-      166,
-      1,
-      0,
-      72,
-      0,
-      "IMAGE"
-    ],
-    [
-      171,
+      179,
       66,
       0,
-      74,
+      78,
       0,
       "SAM2MODEL"
     ],
     [
-      173,
-      74,
+      180,
+      72,
       0,
-      71,
+      78,
+      1,
+      "IMAGE"
+    ],
+    [
+      191,
+      78,
+      0,
+      84,
       1,
       "MASK"
     ],
     [
-      174,
-      75,
+      192,
+      72,
+      0,
+      84,
+      0,
+      "IMAGE"
+    ],
+    [
+      196,
+      83,
+      0,
+      72,
+      0,
+      "IMAGE"
+    ],
+    [
+      213,
+      96,
       1,
-      74,
+      78,
       2,
       "STRING"
-    ],
-    [
-      177,
-      72,
-      0,
-      71,
-      0,
-      "IMAGE"
-    ],
-    [
-      178,
-      72,
-      0,
-      74,
-      1,
-      "IMAGE"
     ]
   ],
   "groups": [],
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.7513148009015777,
+      "scale": 0.6303940863128483,
       "offset": [
-        -137.7377886100651,
-        900.5566826996713
+        725.3145306037434,
+        1267.6359603669778
       ]
     }
   },
