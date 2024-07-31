@@ -124,7 +124,7 @@ class Florence2toCoordinates:
                 center_y = int((min_y + max_y) / 2)
                 center_points.append({"x": center_x, "y": center_y})
             else:
-                print(f"Index {idx} is out of range. Skipping.")
+                raise ValueError(f"There's nothing in index: {idx}")
                 
         coordinates = json.dumps(center_points)
         print("Coordinates:", coordinates)
