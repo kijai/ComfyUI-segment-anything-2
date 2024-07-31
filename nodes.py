@@ -93,6 +93,7 @@ class Florence2toCoordinates:
             "required": {
                 "data": ("JSON", ),
                 "index": ("STRING", {"default": "0"}),
+                "fallback_on_empty": ("STRING", {"default": "[{'x': 0, 'y': 0}]"}),
             },
         }
     
@@ -101,7 +102,7 @@ class Florence2toCoordinates:
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
-    def segment(self, data, index):
+    def segment(self, data, index, fallback_on_empty):
         try:
             coordinates = coordinates.replace("'", '"')
             coordinates = json.loads(coordinates)
@@ -111,7 +112,7 @@ class Florence2toCoordinates:
         print("Data:", data)
 
         if len(data)==0:
-            return ('[]',)
+            return (fallback_on_empty,)
         
         center_points = []
         indexes = [int(i) for i in index.split(",")]
@@ -127,8 +128,11 @@ class Florence2toCoordinates:
                 center_points.append({"x": center_x, "y": center_y})
             else:
                 print(f"Index {idx} is out of range. Skipping.")
-                
-        coordinates = json.dumps(center_points)
+
+        if len(center_points)==0:
+            coordinates = fallback_on_empty
+        else:
+            coordinates = json.dumps(center_points)
         print("Coordinates:", coordinates)
         return (coordinates,)
     
