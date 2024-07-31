@@ -109,6 +109,9 @@ class Florence2toCoordinates:
             coordinates = data
         print("Type of data:", type(data))
         print("Data:", data)
+
+        if len(data)==0:
+            return ('[]',)
         
         center_points = []
         indexes = [int(i) for i in index.split(",")]
