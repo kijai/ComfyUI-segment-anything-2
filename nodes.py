@@ -110,7 +110,7 @@ class Florence2toCoordinates:
         print("Type of data:", type(data))
         print("Data:", data)
         if len(data)==0:
-            return ([{'x': 0, 'y': 0}],)
+            return (json.dumps([{'x': 0, 'y': 0}]),)
         center_points = []
         indexes = [int(i) for i in index.split(",")]
         print("Indexes:", indexes)
