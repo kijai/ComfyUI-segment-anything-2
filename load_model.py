@@ -10,7 +10,7 @@ from .sam2.modeling.memory_encoder import MemoryEncoder, MaskDownSampler, Fuser,
 
 from .sam2.sam2_image_predictor import SAM2ImagePredictor
 from .sam2.sam2_video_predictor import SAM2VideoPredictor
-
+from .sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 from comfy.utils import load_torch_file
 
 def load_model(model_path, model_cfg_path, segmentor, dtype, device):
@@ -185,6 +185,12 @@ def load_model(model_path, model_cfg_path, segmentor, dtype, device):
         model_class = SAM2VideoPredictor
         model = initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, dtype, device)
         model.load_state_dict(sd)
+    elif segmentor == 'automaskgenerator':
+        model_class = SAM2Base
+        model = initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, dtype, device)
+        model.load_state_dict(sd)
+        model = SAM2AutomaticMaskGenerator(model)
+       
     else:
         raise ValueError(f"Segmentor {segmentor} not supported")
 

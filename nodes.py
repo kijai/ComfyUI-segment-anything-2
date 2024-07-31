@@ -24,7 +24,7 @@ class DownloadAndLoadSAM2Model:
                     'sam2_hiera_tiny.safetensors',
                     ],),
             "segmentor": (
-                    ['single_image','video',],
+                    ['single_image','video', 'automaskgenerator'],
                     ),
             "device": (['cuda', 'cpu', 'mps'], ),
             "precision": ([ 'fp16','bf16','fp32'],
@@ -158,13 +158,14 @@ class Sam2Segmentation:
         dtype = sam2_model["dtype"]
         segmentor = sam2_model["segmentor"]
         B, H, W, C = image.shape
+        image_np = (image[0].contiguous() * 255).byte().numpy()
 
         if segmentor == 'video': # video model needs images resized first thing
             model_input_image_size = model.image_size
             print("Resizing to model input image size: ", model_input_image_size)
             image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
 
-        image_np = (image[0].contiguous() * 255).byte().numpy()
+        
         try:
             coordinates_positive = json.loads(coordinates_positive.replace("'", '"'))
             coordinates_positive = [(coord['x'], coord['y']) for coord in coordinates_positive]
@@ -264,14 +265,96 @@ class Sam2Segmentation:
             out_list.append(mask_tensor)
         mask_tensor = torch.stack(out_list, dim=0)
         return (mask_tensor,)
+    
+class Sam2AutoSegmentation:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "sam2_model": ("SAM2MODEL", ),
+                "image": ("IMAGE", ),
+                "points_per_side": ("INT", {"default": 32}),
+                "points_per_batch": ("INT", {"default": 64}),
+                "pred_iou_thresh": ("FLOAT", {"default": 0.8}),
+                "stability_score_thresh": ("FLOAT", {"default": 0.95, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "stability_score_offset": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "mask_threshold": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "crop_n_layers": ("INT", {"default": 0}),
+                "box_nms_thresh": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "crop_nms_thresh": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "crop_overlap_ratio": ("FLOAT", {"default": 0.34, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "crop_n_points_downscale_factor": ("INT", {"default": 1}),
+                "min_mask_region_area": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "use_m2m": ("BOOLEAN", {"default": False}),
+      
+                "keep_model_loaded": ("BOOLEAN", {"default": True}),
+            },
+           
+        }
+    
+    RETURN_TYPES = ("MASK", "BBOX",)
+    RETURN_NAMES =("mask", "bbox" ,)
+    FUNCTION = "segment"
+    CATEGORY = "SAM2"
+
+    def segment(self, image, sam2_model, points_per_side, points_per_batch, pred_iou_thresh, stability_score_thresh, 
+                stability_score_offset, crop_n_layers, box_nms_thresh, crop_n_points_downscale_factor, min_mask_region_area, 
+                use_m2m, mask_threshold, crop_nms_thresh, crop_overlap_ratio, keep_model_loaded):
+        offload_device = mm.unet_offload_device()
+        model = sam2_model["model"]
+        device = sam2_model["device"]
+        dtype = sam2_model["dtype"]
+        segmentor = sam2_model["segmentor"]
+        B, H, W, C = image.shape
+        image_np = (image[0].contiguous() * 255).byte().numpy()
+
+        if segmentor != 'automaskgenerator':
+            raise ValueError("Loaded model is not SAM2AutomaticMaskGenerator")
+        
+        model.points_per_side=points_per_side
+        model.points_per_batch=points_per_batch
+        model.pred_iou_thresh=pred_iou_thresh
+        model.stability_score_thresh=stability_score_thresh
+        model.stability_score_offset=stability_score_offset
+        model.crop_n_layers=crop_n_layers
+        model.box_nms_thresh=box_nms_thresh
+        model.crop_n_points_downscale_factor=crop_n_points_downscale_factor
+        model.crop_nms_thresh=crop_nms_thresh
+        model.crop_overlap_ratio=crop_overlap_ratio
+        model.min_mask_region_area=min_mask_region_area
+        model.use_m2m=use_m2m
+        model.mask_threshold=mask_threshold
+        
+        autocast_condition = not mm.is_device_mps(device)
+
+   
+        model.predictor.model.to(device)
+        mask_list=[]
+        with torch.autocast(mm.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
+            result_dict = model.generate(image_np)
+            print(result_dict[0].keys())
+            mask_list = [item['segmentation'] for item in result_dict]
+            bbox_list = [item['bbox'] for item in result_dict]
+
+        if not keep_model_loaded:
+           model.predictor.model.to(offload_device)
+        
+        out_list = []
+        for mask in mask_list:
+            mask_tensor = torch.from_numpy(mask)
+            out_list.append(mask_tensor)
+        mask_tensor = torch.stack(out_list, dim=0)
+        return (mask_tensor.cpu().float(), bbox_list)
      
 NODE_CLASS_MAPPINGS = {
     "DownloadAndLoadSAM2Model": DownloadAndLoadSAM2Model,
     "Sam2Segmentation": Sam2Segmentation,
-    "Florence2toCoordinates": Florence2toCoordinates
+    "Florence2toCoordinates": Florence2toCoordinates,
+    "Sam2AutoSegmentation": Sam2AutoSegmentation
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadSAM2Model": "(Down)Load SAM2Model",
     "Sam2Segmentation": "Sam2Segmentation",
-    "Florence2toCoordinates": "Florence2 Coordinates"
+    "Florence2toCoordinates": "Florence2 Coordinates",
+    "Sam2AutoSegmentation": "Sam2AutoSegmentation"
 }
