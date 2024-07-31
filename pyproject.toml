@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-segment-anything-2"
+description = "Nodes to use [a/segment-anything-2](https://github.com/facebookresearch/segment-anything-2) for image or video segmentation."
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["pyyaml", "numpy<=1.26.4"]
+
+[project.urls]
+Repository = "https://github.com/kijai/ComfyUI-segment-anything-2"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-segment-anything-2"
+Icon = ""
