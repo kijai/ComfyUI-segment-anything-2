@@ -171,9 +171,10 @@ class Sam2Segmentation:
                 coordinates_negative = json.loads(coordinates_negative.replace("'", '"'))
                 coordinates_negative = [(coord['x'], coord['y']) for coord in coordinates_negative]
         except:
+            # Is this block intentional or work in progress?
             coordinates_positive = coordinates_positive
             if coordinates_negative is not None:
-                coordinates_negative = coordinates_negative
+                coordinates_negative = coordinates_negative 
         
         positive_point_coords = np.array(coordinates_positive)
         positive_point_labels = [1] * len(positive_point_coords)  # 1 = positive
