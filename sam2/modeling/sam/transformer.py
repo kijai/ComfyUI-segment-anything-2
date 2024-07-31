@@ -257,7 +257,7 @@ class Attention(nn.Module):
         if OLD_GPU and dropout_p > 0.0:
             backends.append(SDPBackend.MATH)
         if OLD_GPU:
-            backends.append(SDPBackend.MEM_EFFICIENT_ATTENTION)
+            backends.append(SDPBackend.EFFICIENT_ATTENTION)
         with sdpa_kernel(backends):
             out = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout_p)
 
@@ -326,7 +326,7 @@ class RoPEAttention(Attention):
         if OLD_GPU and dropout_p > 0.0:
             backends.append(SDPBackend.MATH)
         if OLD_GPU:
-            backends.append(SDPBackend.MEM_EFFICIENT_ATTENTION)
+            backends.append(SDPBackend.EFFICIENT_ATTENTION)
         with sdpa_kernel(backends):
             out = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout_p)
 
