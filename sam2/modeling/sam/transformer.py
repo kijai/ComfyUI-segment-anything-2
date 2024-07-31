@@ -9,7 +9,6 @@ import warnings
 from functools import partial
 from typing import Tuple, Type
 
-import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 
@@ -17,7 +16,11 @@ from ....sam2.modeling.position_encoding import apply_rotary_enc, compute_axial_
 from ....sam2.modeling.sam2_utils import MLP
 from ....sam2.utils.misc import get_sdpa_settings
 
-from torch.nn.attention import SDPBackend, sdpa_kernel
+try:
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+except: #old torch
+    from torch.nn.functional import scaled_dot_product_attention as sdpa_kernel
+    from torch._C import _SDPBackend as SDPBackend
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 OLD_GPU, USE_FLASH_ATTN, MATH_KERNEL_ON = get_sdpa_settings()
