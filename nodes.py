@@ -162,6 +162,11 @@ class Sam2Segmentation:
         B, H, W, C = image.shape
         image_np = (image[0].contiguous() * 255).byte().numpy()
 
+        if segmentor == 'automaskgenerator':
+            raise ValueError("For automaskgenerator use Sam2AutoMaskSegmentation -node")
+        if segmentor == 'single_image' and B > 1:
+            raise ValueError("Use video segmentor for multiple frames")
+
         if segmentor == 'video': # video model needs images resized first thing
             model_input_image_size = model.image_size
             print("Resizing to model input image size: ", model_input_image_size)
