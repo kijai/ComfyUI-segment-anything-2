@@ -41,6 +41,7 @@ class SAM2VideoPredictor(SAM2Base):
         images,
         video_height,
         video_width,
+        device,
         offload_video_to_cpu=False,
         offload_state_to_cpu=False,
         async_loading_frames=False,
@@ -66,11 +67,11 @@ class SAM2VideoPredictor(SAM2Base):
         # the original video height and width, used for resizing final output scores
         inference_state["video_height"] = video_height
         inference_state["video_width"] = video_width
-        inference_state["device"] = torch.device("cuda")
+        inference_state["device"] = torch.device(device)
         if offload_state_to_cpu:
             inference_state["storage_device"] = torch.device("cpu")
         else:
-            inference_state["storage_device"] = torch.device("cuda")
+            inference_state["storage_device"] = torch.device(device)
         # inputs on each frame
         inference_state["point_inputs_per_obj"] = {}
         inference_state["mask_inputs_per_obj"] = {}

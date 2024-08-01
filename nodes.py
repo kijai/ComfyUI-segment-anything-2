@@ -144,6 +144,7 @@ class Sam2Segmentation:
             },
             "optional": {
                 "coordinates_negative": ("STRING", {"forceInput": True}),
+                "individual_points": ("BOOLEAN", {"default": False}),
             },
         }
     
@@ -152,7 +153,7 @@ class Sam2Segmentation:
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
-    def segment(self, image, sam2_model, coordinates_positive, keep_model_loaded, coordinates_negative=None):
+    def segment(self, image, sam2_model, coordinates_positive, keep_model_loaded, coordinates_negative=None, individual_points=False):
         offload_device = mm.unet_offload_device()
         model = sam2_model["model"]
         device = sam2_model["device"]
@@ -166,7 +167,6 @@ class Sam2Segmentation:
             print("Resizing to model input image size: ", model_input_image_size)
             image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
 
-        
         try:
             coordinates_positive = json.loads(coordinates_positive.replace("'", '"'))
             coordinates_positive = [(coord['x'], coord['y']) for coord in coordinates_positive]
@@ -230,15 +230,27 @@ class Sam2Segmentation:
                 mask_list = []
                 if hasattr(self, 'inference_state'):
                     model.reset_state(self.inference_state)
-                self.inference_state = model.init_state(image.permute(0, 3, 1, 2).contiguous(), H, W)
+                self.inference_state = model.init_state(image.permute(0, 3, 1, 2).contiguous(), H, W, device=device)
+                
+                if individual_points:
+                    for i, (coord, label) in enumerate(zip(combined_coords, combined_labels)):
+                        _, out_obj_ids, out_mask_logits = model.add_new_points(
+                        inference_state=self.inference_state,
+                        frame_idx=0,
+                        obj_id=i,
+                        points=[combined_coords[i]],
+                        labels=[combined_labels[i]],
+                        )
 
-                _, out_obj_ids, out_mask_logits = model.add_new_points(
-                    inference_state=self.inference_state,
-                    frame_idx=0,
-                    obj_id=1,
-                    points=combined_coords,
-                    labels=combined_labels,
-                )
+                else:
+                    _, out_obj_ids, out_mask_logits = model.add_new_points(
+                        inference_state=self.inference_state,
+                        frame_idx=0,
+                        obj_id=1,
+                        points=combined_coords,
+                        labels=combined_labels,
+                    )
+
                 pbar = ProgressBar(B)
                 video_segments = {}
                 for out_frame_idx, out_obj_ids, out_mask_logits in model.propagate_in_video(self.inference_state):
@@ -247,9 +259,22 @@ class Sam2Segmentation:
                         for i, out_obj_id in enumerate(out_obj_ids)
                         }
                     pbar.update(1)
-                for frame_idx, obj_masks in video_segments.items():
-                    for out_obj_id, out_mask in obj_masks.items():
-                        mask_list.append(out_mask)
+                    if individual_points:
+                        _, _, H, W = out_mask_logits.shape
+                        # Combine masks for all object IDs in the frame
+                        combined_mask = np.zeros((H, W), dtype=np.uint8) 
+                        for i, out_obj_id in enumerate(out_obj_ids):
+                            out_mask = (out_mask_logits[i] > 0.0).cpu().numpy()
+                            combined_mask = np.logical_or(combined_mask, out_mask)
+                        video_segments[out_frame_idx] = combined_mask
+                        
+                if individual_points:
+                    for frame_idx, combined_mask in video_segments.items():
+                        mask_list.append(combined_mask)
+                else:
+                    for frame_idx, obj_masks in video_segments.items():
+                        for out_obj_id, out_mask in obj_masks.items():
+                            mask_list.append(out_mask)
 
         if not keep_model_loaded:
             try:
@@ -267,7 +292,186 @@ class Sam2Segmentation:
             out_list.append(mask_tensor)
         mask_tensor = torch.stack(out_list, dim=0)
         return (mask_tensor,)
+
+class Sam2VideoSegmentationAddPoints:
+    @classmethod
+    def IS_CHANGED(s): # TODO: smarter reset?
+        return ""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "sam2_model": ("SAM2MODEL", ),
+                "coordinates_positive": ("STRING", {"forceInput": True}),
+                "frame_index": ("INT", {"default": 0}),
+                "object_index": ("INT", {"default": 0}),
+            },
+            "optional": {
+                "image": ("IMAGE", ),
+                "coordinates_negative": ("STRING", {"forceInput": True}),
+                "prev_inference_state": ("SAM2INFERENCESTATE", ),
+            },
+        }
     
+    RETURN_TYPES = ("SAM2MODEL", "SAM2INFERENCESTATE", )
+    RETURN_NAMES =("sam2_model", "inference_state", )
+    FUNCTION = "segment"
+    CATEGORY = "SAM2"
+
+    def segment(self, sam2_model, coordinates_positive, frame_index, object_index, image=None, coordinates_negative=None, prev_inference_state=None):
+        offload_device = mm.unet_offload_device()
+        model = sam2_model["model"]
+        device = sam2_model["device"]
+        dtype = sam2_model["dtype"]
+        segmentor = sam2_model["segmentor"]
+        
+
+        if segmentor != 'video':
+            raise ValueError("Loaded model is not SAM2Video")
+        if image is not None:
+            B, H, W, C = image.shape
+            model_input_image_size = model.image_size
+            print("Resizing to model input image size: ", model_input_image_size)
+            image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
+
+        try:
+            coordinates_positive = json.loads(coordinates_positive.replace("'", '"'))
+            coordinates_positive = [(coord['x'], coord['y']) for coord in coordinates_positive]
+            if coordinates_negative is not None:
+                coordinates_negative = json.loads(coordinates_negative.replace("'", '"'))
+                coordinates_negative = [(coord['x'], coord['y']) for coord in coordinates_negative]
+        except:
+            coordinates_positive = coordinates_positive
+            if coordinates_negative is not None:
+                coordinates_negative = coordinates_negative
+        
+        positive_point_coords = np.array(coordinates_positive)
+        positive_point_labels = [1] * len(positive_point_coords)  # 1 = positive
+        positive_point_labels = np.array(positive_point_labels)
+        print("positive coordinates: ", positive_point_coords)
+
+        if coordinates_negative is not None:
+            negative_point_coords = np.array(coordinates_negative)
+            negative_point_labels = [0] * len(negative_point_coords)  # 0 = negative
+            negative_point_labels = np.array(negative_point_labels)
+            print("negative coordinates: ", negative_point_coords)
+
+            # Combine coordinates and labels
+        else:
+            negative_point_coords = np.empty((0, 2))
+            negative_point_labels = np.array([])
+        # Ensure both positive and negative coordinates are 2D arrays
+        positive_point_coords = np.atleast_2d(positive_point_coords)
+        negative_point_coords = np.atleast_2d(negative_point_coords)
+
+        # Ensure both positive and negative labels are 1D arrays
+        positive_point_labels = np.atleast_1d(positive_point_labels)
+        negative_point_labels = np.atleast_1d(negative_point_labels)
+
+        combined_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=0)
+        combined_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=0)
+        
+        model.to(device)
+        
+        autocast_condition = not mm.is_device_mps(device)
+        with torch.autocast(mm.get_autocast_device(model.device), dtype=dtype) if autocast_condition else nullcontext(): 
+            if prev_inference_state is None:
+                print("Initializing inference state")
+                if hasattr(self, 'inference_state'):
+                    model.reset_state(self.inference_state)
+                self.inference_state = model.init_state(image.permute(0, 3, 1, 2).contiguous(), H, W, device=device)
+            else:
+                print("Using previous inference state")
+                B = prev_inference_state['num_frames']
+                self.inference_state = prev_inference_state['inference_state']
+            _, out_obj_ids, out_mask_logits = model.add_new_points(
+                inference_state=self.inference_state,
+                frame_idx=frame_index,
+                obj_id=object_index,
+                points=combined_coords,
+                labels=combined_labels,
+            )
+        inference_state = {
+            "inference_state": self.inference_state,
+            "num_frames": B,
+        }
+        sam2_model = {
+            'model': model, 
+            'dtype': dtype,
+            'device': device,
+            'segmentor' : segmentor
+            }    
+        return (sam2_model, inference_state,)
+
+class Sam2VideoSegmentation:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "sam2_model": ("SAM2MODEL", ),
+                "inference_state": ("SAM2INFERENCESTATE", ),
+                "keep_model_loaded": ("BOOLEAN", {"default": True}),
+            },
+        }
+    
+    RETURN_TYPES = ("MASK", )
+    RETURN_NAMES =("mask", )
+    FUNCTION = "segment"
+    CATEGORY = "SAM2"
+
+    def segment(self, sam2_model, inference_state, keep_model_loaded):
+        offload_device = mm.unet_offload_device()
+        model = sam2_model["model"]
+        device = sam2_model["device"]
+        dtype = sam2_model["dtype"]
+        segmentor = sam2_model["segmentor"]
+        inference_state = inference_state["inference_state"]
+        B = inference_state["num_frames"]
+
+        if segmentor != 'video':
+            raise ValueError("Loaded model is not SAM2Video")
+
+        model.to(device)
+        
+        autocast_condition = not mm.is_device_mps(device)
+        with torch.autocast(mm.get_autocast_device(model.device), dtype=dtype) if autocast_condition else nullcontext(): 
+            
+            #if hasattr(self, 'inference_state'):
+            #    model.reset_state(self.inference_state)
+
+            pbar = ProgressBar(B)
+            video_segments = {}
+            for out_frame_idx, out_obj_ids, out_mask_logits in model.propagate_in_video(inference_state):
+                print("out_mask_logits",out_mask_logits.shape)
+                _, _, H, W = out_mask_logits.shape
+                # Combine masks for all object IDs in the frame
+                combined_mask = np.zeros((H, W), dtype=np.uint8) 
+                for i, out_obj_id in enumerate(out_obj_ids):
+                    out_mask = (out_mask_logits[i] > 0.0).cpu().numpy()
+                    combined_mask = np.logical_or(combined_mask, out_mask)
+                video_segments[out_frame_idx] = combined_mask
+                pbar.update(1)
+
+            mask_list = []
+            # Collect the combined masks
+            for frame_idx, combined_mask in video_segments.items():
+                mask_list.append(combined_mask)
+            print(f"Total masks collected: {len(mask_list)}")
+
+        if not keep_model_loaded:
+            model.to(offload_device)
+        
+        out_list = []
+        for mask in mask_list:
+            mask_tensor = torch.from_numpy(mask)
+            mask_tensor = mask_tensor.permute(1, 2, 0).cpu().float()
+            mask_tensor = mask_tensor.mean(dim=-1, keepdim=True)
+            mask_tensor = mask_tensor.repeat(1, 1, 3)
+            mask_tensor = mask_tensor[:, :, 0]
+            out_list.append(mask_tensor)
+        mask_tensor = torch.stack(out_list, dim=0)
+        return (mask_tensor,)
+        
 class Sam2AutoSegmentation:
     @classmethod
     def INPUT_TYPES(s):
@@ -385,11 +589,15 @@ NODE_CLASS_MAPPINGS = {
     "DownloadAndLoadSAM2Model": DownloadAndLoadSAM2Model,
     "Sam2Segmentation": Sam2Segmentation,
     "Florence2toCoordinates": Florence2toCoordinates,
-    "Sam2AutoSegmentation": Sam2AutoSegmentation
+    "Sam2AutoSegmentation": Sam2AutoSegmentation,
+    "Sam2VideoSegmentationAddPoints": Sam2VideoSegmentationAddPoints,
+    "Sam2VideoSegmentation": Sam2VideoSegmentation
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadSAM2Model": "(Down)Load SAM2Model",
     "Sam2Segmentation": "Sam2Segmentation",
     "Florence2toCoordinates": "Florence2 Coordinates",
-    "Sam2AutoSegmentation": "Sam2AutoSegmentation"
+    "Sam2AutoSegmentation": "Sam2AutoSegmentation",
+    "Sam2VideoSegmentationAddPoints": "Sam2VideoSegmentationAddPoints",
+    "Sam2VideoSegmentation": "Sam2VideoSegmentation"
 }
