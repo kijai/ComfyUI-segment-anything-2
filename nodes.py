@@ -113,7 +113,12 @@ class Florence2toCoordinates:
         if len(data)==0:
             return (json.dumps([{'x': 0, 'y': 0}]),)
         center_points = []
-        indexes = [int(i) for i in index.split(",")]
+
+        if index.strip():  # Check if index is not empty
+            indexes = [int(i) for i in index.split(",")]
+        else:  # If index is empty, use all indices from data[0]
+            indexes = list(range(len(data[0])))
+            
         print("Indexes:", indexes)
         
         for idx in indexes:
