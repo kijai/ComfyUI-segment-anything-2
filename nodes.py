@@ -262,6 +262,8 @@ class Sam2Segmentation:
         autocast_condition = not mm.is_device_mps(device)
         with torch.autocast(mm.get_autocast_device(model.device), dtype=dtype) if autocast_condition else nullcontext():
             if image.shape[0] == 1:
+                if segmentor == 'video':
+                    raise ValueError("Video segmentor needs more than one frame")
                 model.set_image(image_np) 
                 masks, scores, logits = model.predict(
                     point_coords=final_coords if coordinates_positive is not None else None, 
