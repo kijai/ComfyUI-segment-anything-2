@@ -1,6 +1,6 @@
 {
-  "last_node_id": 101,
-  "last_link_id": 235,
+  "last_node_id": 102,
+  "last_link_id": 239,
   "nodes": [
     {
       "id": 83,
@@ -42,31 +42,6 @@
       ]
     },
     {
-      "id": 90,
-      "type": "PreviewImage",
-      "pos": [
-        409,
-        -775
-      ],
-      "size": {
-        "0": 568.406494140625,
-        "1": 384.9489440917969
-      },
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 200
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      }
-    },
-    {
       "id": 66,
       "type": "DownloadAndLoadSAM2Model",
       "pos": [
@@ -85,7 +60,7 @@
           "name": "sam2_model",
           "type": "SAM2MODEL",
           "links": [
-            231
+            236
           ],
           "shape": 3,
           "slot_index": 0
@@ -113,7 +88,7 @@
         "1": 541.2733154296875
       },
       "flags": {},
-      "order": 10,
+      "order": 9,
       "mode": 0,
       "inputs": [
         {
@@ -124,7 +99,7 @@
         {
           "name": "mask",
           "type": "MASK",
-          "link": 233,
+          "link": 238,
           "slot_index": 1
         }
       ],
@@ -143,40 +118,6 @@
         1,
         "255, 0, 0",
         false
-      ]
-    },
-    {
-      "id": 88,
-      "type": "DownloadAndLoadFlorence2Model",
-      "pos": [
-        -512,
-        -707
-      ],
-      "size": {
-        "0": 315,
-        "1": 106
-      },
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "florence2_model",
-          "type": "FL2MODEL",
-          "links": [
-            197
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "DownloadAndLoadFlorence2Model"
-      },
-      "widgets_values": [
-        "microsoft/Florence-2-base",
-        "fp16",
-        "sdpa"
       ]
     },
     {
@@ -229,7 +170,7 @@
             192,
             210,
             226,
-            232
+            237
           ],
           "shape": 3,
           "slot_index": 0
@@ -286,6 +227,77 @@
       }
     },
     {
+      "id": 90,
+      "type": "PreviewImage",
+      "pos": [
+        422,
+        -800
+      ],
+      "size": {
+        "0": 568.406494140625,
+        "1": 384.9489440917969
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 200
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 93,
+      "type": "Florence2toCoordinates",
+      "pos": [
+        399,
+        -314
+      ],
+      "size": {
+        "0": 210,
+        "1": 78
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "data",
+          "type": "JSON",
+          "link": 204
+        }
+      ],
+      "outputs": [
+        {
+          "name": "coordinates",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "bboxes",
+          "type": "BBOX",
+          "links": [
+            239
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Florence2toCoordinates"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
       "id": 87,
       "type": "Florence2Run",
       "pos": [
@@ -340,8 +352,7 @@
           "name": "data",
           "type": "JSON",
           "links": [
-            204,
-            225
+            204
           ],
           "shape": 3,
           "slot_index": 3
@@ -362,125 +373,50 @@
       ]
     },
     {
-      "id": 93,
-      "type": "Florence2toCoordinates",
+      "id": 102,
+      "type": "Sam2Segmentation",
       "pos": [
-        388,
-        -336
+        440,
+        -120
       ],
-      "size": {
-        "0": 210,
-        "1": 58
-      },
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "data",
-          "type": "JSON",
-          "link": 204
-        }
+      "size": [
+        314.5386123916544,
+        162
       ],
-      "outputs": [
-        {
-          "name": "coordinates",
-          "type": "STRING",
-          "links": [
-            234
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "Florence2toCoordinates"
-      },
-      "widgets_values": [
-        "0, 1"
-      ]
-    },
-    {
-      "id": 98,
-      "type": "Florence2toCoordinates",
-      "pos": [
-        392,
-        -231
-      ],
-      "size": {
-        "0": 210,
-        "1": 58
-      },
       "flags": {},
       "order": 8,
       "mode": 0,
       "inputs": [
         {
-          "name": "data",
-          "type": "JSON",
-          "link": 225
-        }
-      ],
-      "outputs": [
-        {
-          "name": "coordinates",
-          "type": "STRING",
-          "links": [
-            235
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "Florence2toCoordinates"
-      },
-      "widgets_values": [
-        "2"
-      ]
-    },
-    {
-      "id": 101,
-      "type": "Sam2Segmentation",
-      "pos": [
-        437,
-        -89
-      ],
-      "size": [
-        315,
-        126
-      ],
-      "flags": {},
-      "order": 9,
-      "mode": 0,
-      "inputs": [
-        {
           "name": "sam2_model",
           "type": "SAM2MODEL",
-          "link": 231
+          "link": 236
         },
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 232
+          "link": 237
+        },
+        {
+          "name": "bboxes",
+          "type": "BBOX",
+          "link": 239
         },
         {
           "name": "coordinates_positive",
           "type": "STRING",
-          "link": 234,
+          "link": null,
           "widget": {
             "name": "coordinates_positive"
-          },
-          "slot_index": 2
+          }
         },
         {
           "name": "coordinates_negative",
           "type": "STRING",
-          "link": 235,
+          "link": null,
           "widget": {
             "name": "coordinates_negative"
-          },
-          "slot_index": 3
+          }
         }
       ],
       "outputs": [
@@ -488,19 +424,53 @@
           "name": "mask",
           "type": "MASK",
           "links": [
-            233
+            238
           ],
-          "shape": 3,
-          "slot_index": 0
+          "shape": 3
         }
       ],
       "properties": {
         "Node name for S&R": "Sam2Segmentation"
       },
       "widgets_values": [
-        "",
         true,
-        ""
+        "",
+        "",
+        true
+      ]
+    },
+    {
+      "id": 88,
+      "type": "DownloadAndLoadFlorence2Model",
+      "pos": [
+        -470,
+        -777
+      ],
+      "size": {
+        "0": 315,
+        "1": 106
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "florence2_model",
+          "type": "FL2MODEL",
+          "links": [
+            197
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DownloadAndLoadFlorence2Model"
+      },
+      "widgets_values": [
+        "microsoft/Florence-2-base",
+        "fp16",
+        "sdpa"
       ]
     }
   ],
@@ -554,14 +524,6 @@
       "IMAGE"
     ],
     [
-      225,
-      87,
-      3,
-      98,
-      0,
-      "JSON"
-    ],
-    [
       226,
       72,
       0,
@@ -570,44 +532,36 @@
       "IMAGE"
     ],
     [
-      231,
+      236,
       66,
       0,
-      101,
+      102,
       0,
       "SAM2MODEL"
     ],
     [
-      232,
+      237,
       72,
       0,
-      101,
+      102,
       1,
       "IMAGE"
     ],
     [
-      233,
-      101,
+      238,
+      102,
       0,
       84,
       1,
       "MASK"
     ],
     [
-      234,
+      239,
       93,
-      0,
-      101,
+      1,
+      102,
       2,
-      "STRING"
-    ],
-    [
-      235,
-      98,
-      0,
-      101,
-      3,
-      "STRING"
+      "BBOX"
     ]
   ],
   "groups": [],
@@ -616,8 +570,8 @@
     "ds": {
       "scale": 0.7627768444385467,
       "offset": [
-        663.0888928776299,
-        959.3311266780172
+        564.3268832902941,
+        896.4031145502903
       ]
     }
   },

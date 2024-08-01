@@ -1,6 +1,6 @@
 {
-  "last_node_id": 97,
-  "last_link_id": 218,
+  "last_node_id": 98,
+  "last_link_id": 222,
   "nodes": [
     {
       "id": 83,
@@ -60,7 +60,7 @@
           "name": "sam2_model",
           "type": "SAM2MODEL",
           "links": [
-            214
+            219
           ],
           "shape": 3,
           "slot_index": 0
@@ -124,7 +124,7 @@
           "type": "IMAGE",
           "links": [
             192,
-            215
+            220
           ],
           "shape": 3,
           "slot_index": 0
@@ -178,7 +178,7 @@
         {
           "name": "mask",
           "type": "MASK",
-          "link": 216,
+          "link": 222,
           "slot_index": 1
         }
       ],
@@ -197,69 +197,6 @@
         1,
         "255, 0, 0",
         false
-      ]
-    },
-    {
-      "id": 97,
-      "type": "Sam2Segmentation",
-      "pos": [
-        374,
-        -65
-      ],
-      "size": [
-        315,
-        126
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "sam2_model",
-          "type": "SAM2MODEL",
-          "link": 214
-        },
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 215
-        },
-        {
-          "name": "coordinates_positive",
-          "type": "STRING",
-          "link": 218,
-          "widget": {
-            "name": "coordinates_positive"
-          },
-          "slot_index": 2
-        },
-        {
-          "name": "coordinates_negative",
-          "type": "STRING",
-          "link": null,
-          "widget": {
-            "name": "coordinates_negative"
-          }
-        }
-      ],
-      "outputs": [
-        {
-          "name": "mask",
-          "type": "MASK",
-          "links": [
-            216
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "Sam2Segmentation"
-      },
-      "widgets_values": [
-        "",
-        true,
-        ""
       ]
     },
     {
@@ -287,7 +224,7 @@
           "name": "coord_str",
           "type": "STRING",
           "links": [
-            218
+            221
           ],
           "shape": 3,
           "slot_index": 1
@@ -317,12 +254,12 @@
       },
       "widgets_values": [
         "[{\"x\":295.0535292738977,\"y\":285.53567349086876},{\"x\":377.54161272681534,\"y\":287.12198278804027}]",
-        "[{\"x\":295.05352783203125,\"y\":285.5356750488281},{\"x\":377.5416259765625,\"y\":287.1219787597656}]",
+        "[{\"x\":295.0535292738977,\"y\":285.53567349086876},{\"x\":377.54161272681534,\"y\":287.12198278804027}]",
         768,
         512,
         2,
-        "path",
-        "cardinal",
+        "controlpoints",
+        "linear",
         0.5,
         1,
         "list",
@@ -330,6 +267,73 @@
         1,
         null,
         null
+      ]
+    },
+    {
+      "id": 98,
+      "type": "Sam2Segmentation",
+      "pos": [
+        380,
+        -100
+      ],
+      "size": [
+        316.01859966191455,
+        162
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "sam2_model",
+          "type": "SAM2MODEL",
+          "link": 219
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 220
+        },
+        {
+          "name": "bboxes",
+          "type": "BBOX",
+          "link": null
+        },
+        {
+          "name": "coordinates_positive",
+          "type": "STRING",
+          "link": 221,
+          "widget": {
+            "name": "coordinates_positive"
+          }
+        },
+        {
+          "name": "coordinates_negative",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "coordinates_negative"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            222
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Sam2Segmentation"
+      },
+      "widgets_values": [
+        true,
+        "",
+        "",
+        false
       ]
     }
   ],
@@ -351,36 +355,36 @@
       "IMAGE"
     ],
     [
-      214,
+      219,
       66,
       0,
-      97,
+      98,
       0,
       "SAM2MODEL"
     ],
     [
-      215,
+      220,
       72,
       0,
-      97,
+      98,
       1,
       "IMAGE"
     ],
     [
-      216,
-      97,
+      221,
+      96,
+      1,
+      98,
+      3,
+      "STRING"
+    ],
+    [
+      222,
+      98,
       0,
       84,
       1,
       "MASK"
-    ],
-    [
-      218,
-      96,
-      1,
-      97,
-      2,
-      "STRING"
     ]
   ],
   "groups": [],
@@ -389,8 +393,8 @@
     "ds": {
       "scale": 0.6303940863128483,
       "offset": [
-        725.3145306037434,
-        1267.6359603669778
+        672.4375863049054,
+        1167.1697371529935
       ]
     }
   },

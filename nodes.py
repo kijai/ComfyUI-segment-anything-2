@@ -97,12 +97,13 @@ class Florence2toCoordinates:
             },
         }
     
-    RETURN_TYPES = ("STRING", )
-    RETURN_NAMES =("coordinates", )
+    RETURN_TYPES = ("STRING", "BBOX")
+    RETURN_NAMES =("center_coordinates", "bboxes")
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
     def segment(self, data, index):
+        print(data)
         try:
             coordinates = coordinates.replace("'", '"')
             coordinates = json.loads(coordinates)
@@ -118,8 +119,9 @@ class Florence2toCoordinates:
             indexes = [int(i) for i in index.split(",")]
         else:  # If index is empty, use all indices from data[0]
             indexes = list(range(len(data[0])))
-            
+
         print("Indexes:", indexes)
+        bboxes = []
         
         for idx in indexes:
             if 0 <= idx < len(data[0]):
@@ -129,12 +131,13 @@ class Florence2toCoordinates:
                 center_x = int((min_x + max_x) / 2)
                 center_y = int((min_y + max_y) / 2)
                 center_points.append({"x": center_x, "y": center_y})
+                bboxes.append(bbox)
             else:
                 raise ValueError(f"There's nothing in index: {idx}")
                 
         coordinates = json.dumps(center_points)
         print("Coordinates:", coordinates)
-        return (coordinates,)
+        return (coordinates, bboxes)
     
 class Sam2Segmentation:
     @classmethod
@@ -143,13 +146,14 @@ class Sam2Segmentation:
             "required": {
                 "sam2_model": ("SAM2MODEL", ),
                 "image": ("IMAGE", ),
-                "coordinates_positive": ("STRING", {"forceInput": True}),
-               
                 "keep_model_loaded": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "coordinates_positive": ("STRING", {"forceInput": True}),
                 "coordinates_negative": ("STRING", {"forceInput": True}),
-                "individual_points": ("BOOLEAN", {"default": False}),
+                "bboxes": ("BBOX", ),
+                "individual_objects": ("BOOLEAN", {"default": False}),
+                
             },
         }
     
@@ -158,7 +162,7 @@ class Sam2Segmentation:
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
-    def segment(self, image, sam2_model, coordinates_positive, keep_model_loaded, coordinates_negative=None, individual_points=False):
+    def segment(self, image, sam2_model, keep_model_loaded, coordinates_positive=None, coordinates_negative=None, individual_objects=False, bboxes=None):
         offload_device = mm.unet_offload_device()
         model = sam2_model["model"]
         device = sam2_model["device"]
@@ -172,47 +176,82 @@ class Sam2Segmentation:
         if segmentor == 'single_image' and B > 1:
             raise ValueError("Use video segmentor for multiple frames")
 
+        if segmentor == 'video' and bboxes is not None:
+            raise ValueError("Video segmentor doesn't support bboxes")
+
         if segmentor == 'video': # video model needs images resized first thing
             model_input_image_size = model.image_size
             print("Resizing to model input image size: ", model_input_image_size)
             image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
 
-        try:
-            coordinates_positive = json.loads(coordinates_positive.replace("'", '"'))
-            coordinates_positive = [(coord['x'], coord['y']) for coord in coordinates_positive]
+        #handle point coordinates
+        if coordinates_positive is not None:
+            try:
+                coordinates_positive = json.loads(coordinates_positive.replace("'", '"'))
+                coordinates_positive = [(coord['x'], coord['y']) for coord in coordinates_positive]
+                if coordinates_negative is not None:
+                    coordinates_negative = json.loads(coordinates_negative.replace("'", '"'))
+                    coordinates_negative = [(coord['x'], coord['y']) for coord in coordinates_negative]
+            except:
+                pass
+            
+            if not individual_objects:
+                positive_point_coords = np.atleast_2d(np.array(coordinates_positive))
+            else:
+                positive_point_coords = np.array([np.atleast_2d(coord) for coord in coordinates_positive])
+
             if coordinates_negative is not None:
-                coordinates_negative = json.loads(coordinates_negative.replace("'", '"'))
-                coordinates_negative = [(coord['x'], coord['y']) for coord in coordinates_negative]
-        except:
-            coordinates_positive = coordinates_positive
+                negative_point_coords = np.array(coordinates_negative)
+                # Ensure both positive and negative coords are lists of 2D arrays if individual_objects is True
+                if individual_objects:
+                    if negative_point_coords.ndim == 2:
+                        negative_point_coords = negative_point_coords[:, np.newaxis, :]
+                    final_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=1)
+                else:
+                    final_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=0)
+            else:
+                final_coords = positive_point_coords
+
+        # Handle possible bboxes
+        if bboxes is not None:
+            boxes_np_batch = []
+            for bbox_list in bboxes:
+                boxes_np = []
+                for bbox in bbox_list:
+                    boxes_np.append(bbox)
+                boxes_np = np.array(boxes_np)
+                boxes_np_batch.append(boxes_np)
+            if individual_objects:
+                final_box = np.array(boxes_np_batch)
+            else:
+                final_box = np.array(boxes_np)
+            final_labels = None
+
+        #handle labels
+        if coordinates_positive is not None:
+            if not individual_objects:
+                positive_point_labels = np.ones(len(positive_point_coords))
+            else:
+                positive_labels = []
+                for point in positive_point_coords:
+                    positive_labels.append(np.array([1])) # 1)
+                positive_point_labels = np.stack(positive_labels, axis=0)
+                
             if coordinates_negative is not None:
-                coordinates_negative = coordinates_negative
-        
-        positive_point_coords = np.array(coordinates_positive)
-        positive_point_labels = [1] * len(positive_point_coords)  # 1 = positive
-        positive_point_labels = np.array(positive_point_labels)
-        print("positive coordinates: ", positive_point_coords)
-
-        if coordinates_negative is not None:
-            negative_point_coords = np.array(coordinates_negative)
-            negative_point_labels = [0] * len(negative_point_coords)  # 0 = negative
-            negative_point_labels = np.array(negative_point_labels)
-            print("negative coordinates: ", negative_point_coords)
-
-            # Combine coordinates and labels
-        else:
-            negative_point_coords = np.empty((0, 2))
-            negative_point_labels = np.array([])
-        # Ensure both positive and negative coordinates are 2D arrays
-        positive_point_coords = np.atleast_2d(positive_point_coords)
-        negative_point_coords = np.atleast_2d(negative_point_coords)
-
-        # Ensure both positive and negative labels are 1D arrays
-        positive_point_labels = np.atleast_1d(positive_point_labels)
-        negative_point_labels = np.atleast_1d(negative_point_labels)
-
-        combined_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=0)
-        combined_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=0)
+                if not individual_objects:
+                    negative_point_labels = np.zeros(len(negative_point_coords))  # 0 = negative
+                    final_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=0)
+                else:
+                    negative_labels = []
+                    for point in positive_point_coords:
+                        negative_labels.append(np.array([0])) # 1)
+                    negative_point_labels = np.stack(negative_labels, axis=0)
+                    #combine labels
+                    final_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=1)                    
+            else:
+                final_labels = positive_point_labels
+            print("combined labels: ", final_labels)
+            print("combined labels shape: ", final_labels.shape)          
         
         mask_list = []
         try:
@@ -225,16 +264,26 @@ class Sam2Segmentation:
             if image.shape[0] == 1:
                 model.set_image(image_np) 
                 masks, scores, logits = model.predict(
-                    point_coords=combined_coords, 
-                    point_labels=combined_labels,
-                    multimask_output=True,
+                    point_coords=final_coords if coordinates_positive is not None else None, 
+                    point_labels=final_labels,
+                    box=final_box if bboxes is not None else None,
+                    multimask_output=True if not individual_objects else False,
                     )
-
-                sorted_ind = np.argsort(scores)[::-1]
-                masks = masks[sorted_ind][0] #choose only the best result for now
-                scores = scores[sorted_ind]
-                logits = logits[sorted_ind]
-                mask_list.append(np.expand_dims(masks, axis=0))
+               
+                if masks.ndim == 3:
+                    sorted_ind = np.argsort(scores)[::-1]
+                    masks = masks[sorted_ind][0] #choose only the best result for now
+                    scores = scores[sorted_ind]
+                    logits = logits[sorted_ind]
+                    mask_list.append(np.expand_dims(masks, axis=0))
+                else:
+                    _, _, H, W = masks.shape
+                    # Combine masks for all object IDs in the frame
+                    combined_mask = np.zeros((H, W), dtype=bool)
+                    for mask in masks:
+                        combined_mask = np.logical_or(combined_mask, mask)
+                    combined_mask = combined_mask.astype(np.uint8)
+                    mask_list.append(combined_mask)
 
             else:
                 mask_list = []
@@ -242,23 +291,22 @@ class Sam2Segmentation:
                     model.reset_state(self.inference_state)
                 self.inference_state = model.init_state(image.permute(0, 3, 1, 2).contiguous(), H, W, device=device)
                 
-                if individual_points:
-                    for i, (coord, label) in enumerate(zip(combined_coords, combined_labels)):
+                if individual_objects:
+                    for i, (coord, label) in enumerate(zip(final_coords, final_labels)):
                         _, out_obj_ids, out_mask_logits = model.add_new_points(
                         inference_state=self.inference_state,
                         frame_idx=0,
                         obj_id=i,
-                        points=[combined_coords[i]],
-                        labels=[combined_labels[i]],
+                        points=final_coords[i],
+                        labels=final_labels[i],
                         )
-
                 else:
                     _, out_obj_ids, out_mask_logits = model.add_new_points(
                         inference_state=self.inference_state,
                         frame_idx=0,
                         obj_id=1,
-                        points=combined_coords,
-                        labels=combined_labels,
+                        points=final_coords,
+                        labels=final_labels,
                     )
 
                 pbar = ProgressBar(B)
@@ -269,7 +317,7 @@ class Sam2Segmentation:
                         for i, out_obj_id in enumerate(out_obj_ids)
                         }
                     pbar.update(1)
-                    if individual_points:
+                    if individual_objects:
                         _, _, H, W = out_mask_logits.shape
                         # Combine masks for all object IDs in the frame
                         combined_mask = np.zeros((H, W), dtype=np.uint8) 
@@ -278,7 +326,7 @@ class Sam2Segmentation:
                             combined_mask = np.logical_or(combined_mask, out_mask)
                         video_segments[out_frame_idx] = combined_mask
 
-                if individual_points:
+                if individual_objects:
                     for frame_idx, combined_mask in video_segments.items():
                         mask_list.append(combined_mask)
                 else:
