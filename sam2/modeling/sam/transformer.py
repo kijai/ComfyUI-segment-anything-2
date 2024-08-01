@@ -331,7 +331,7 @@ class RoPEAttention(Attention):
         # Attention
         if not OLD_TORCH:
             if not MATH_KERNEL_ON and OLD_GPU and dropout_p > 0.0:
-                backends.append(SDPBackend.MATH))
+                backends.append(SDPBackend.MATH)
             with sdpa_kernel(backends):
                 out = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout_p)
         else:
