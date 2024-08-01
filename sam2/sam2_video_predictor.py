@@ -7,7 +7,7 @@
 from collections import OrderedDict
 
 import torch
-
+import numpy as np
 from tqdm import tqdm
 
 from ..sam2.modeling.sam2_base import NO_OBJ_SCORE, SAM2Base
@@ -41,7 +41,7 @@ class SAM2VideoPredictor(SAM2Base):
         images,
         video_height,
         video_width,
-        device,
+        device='cuda',
         offload_video_to_cpu=False,
         offload_state_to_cpu=False,
         async_loading_frames=False,
@@ -165,8 +165,13 @@ class SAM2VideoPredictor(SAM2Base):
         mask_inputs_per_frame = inference_state["mask_inputs_per_obj"][obj_idx]
 
         if not isinstance(points, torch.Tensor):
+            if isinstance(points, list) and all(isinstance(p, np.ndarray) for p in points):
+                points = np.array(points)
             points = torch.tensor(points, dtype=torch.float32)
+
         if not isinstance(labels, torch.Tensor):
+            if isinstance(labels, list) and all(isinstance(l, np.ndarray) for l in labels):
+                labels = np.array(labels)
             labels = torch.tensor(labels, dtype=torch.int32)
         if points.dim() == 2:
             points = points.unsqueeze(0)  # add batch dimension
