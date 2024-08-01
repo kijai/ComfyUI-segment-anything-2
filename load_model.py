@@ -190,7 +190,6 @@ def load_model(model_path, model_cfg_path, segmentor, dtype, device):
         model = initialize_model(model_class, model_config, segmentor, image_encoder, memory_attention, memory_encoder, sam_mask_decoder_extra_args, dtype, device)
         model.load_state_dict(sd)
         model = SAM2AutomaticMaskGenerator(model)
-       
     else:
         raise ValueError(f"Segmentor {segmentor} not supported")
 

@@ -267,7 +267,7 @@ class Sam2Segmentation:
                             out_mask = (out_mask_logits[i] > 0.0).cpu().numpy()
                             combined_mask = np.logical_or(combined_mask, out_mask)
                         video_segments[out_frame_idx] = combined_mask
-                        
+
                 if individual_points:
                     for frame_idx, combined_mask in video_segments.items():
                         mask_list.append(combined_mask)
@@ -341,9 +341,7 @@ class Sam2VideoSegmentationAddPoints:
                 coordinates_negative = json.loads(coordinates_negative.replace("'", '"'))
                 coordinates_negative = [(coord['x'], coord['y']) for coord in coordinates_negative]
         except:
-            coordinates_positive = coordinates_positive
-            if coordinates_negative is not None:
-                coordinates_negative = coordinates_negative
+            pass
         
         positive_point_coords = np.array(coordinates_positive)
         positive_point_labels = [1] * len(positive_point_coords)  # 1 = positive
@@ -492,7 +490,6 @@ class Sam2AutoSegmentation:
                 "crop_n_points_downscale_factor": ("INT", {"default": 1}),
                 "min_mask_region_area": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "use_m2m": ("BOOLEAN", {"default": False}),
-      
                 "keep_model_loaded": ("BOOLEAN", {"default": True}),
             },
            
