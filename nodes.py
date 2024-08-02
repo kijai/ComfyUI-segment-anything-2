@@ -345,12 +345,10 @@ class Sam2Segmentation:
         out_list = []
         for mask in mask_list:
             mask_tensor = torch.from_numpy(mask)
-            mask_tensor = mask_tensor.permute(1, 2, 0).cpu().float()
-            mask_tensor = mask_tensor.mean(dim=-1, keepdim=True)
-            mask_tensor = mask_tensor.repeat(1, 1, 3)
+            mask_tensor = mask_tensor.permute(1, 2, 0)
             mask_tensor = mask_tensor[:, :, 0]
             out_list.append(mask_tensor)
-        mask_tensor = torch.stack(out_list, dim=0)
+        mask_tensor = torch.stack(out_list, dim=0).cpu().float()
         return (mask_tensor,)
 
 class Sam2VideoSegmentationAddPoints:
@@ -522,12 +520,10 @@ class Sam2VideoSegmentation:
         out_list = []
         for mask in mask_list:
             mask_tensor = torch.from_numpy(mask)
-            mask_tensor = mask_tensor.permute(1, 2, 0).cpu().float()
-            mask_tensor = mask_tensor.mean(dim=-1, keepdim=True)
-            mask_tensor = mask_tensor.repeat(1, 1, 3)
+            mask_tensor = mask_tensor.permute(1, 2, 0)
             mask_tensor = mask_tensor[:, :, 0]
             out_list.append(mask_tensor)
-        mask_tensor = torch.stack(out_list, dim=0)
+        mask_tensor = torch.stack(out_list, dim=0).cpu().float()
         return (mask_tensor,)
         
 class Sam2AutoSegmentation:
