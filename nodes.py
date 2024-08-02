@@ -51,6 +51,7 @@ class DownloadAndLoadSAM2Model:
                 torch.backends.cuda.matmul.allow_tf32 = True
                 torch.backends.cudnn.allow_tf32 = True
         dtype = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[precision]
+        device = {"cuda": torch.device("cuda"), "cpu": torch.device("cpu"), "mps": torch.device("mps")}[device]
 
         download_path = os.path.join(folder_paths.models_dir, "sam2")
         model_path = os.path.join(download_path, model)
@@ -260,7 +261,7 @@ class Sam2Segmentation:
             model.model.to(device)
         
         autocast_condition = not mm.is_device_mps(device)
-        with torch.autocast(mm.get_autocast_device(model.device), dtype=dtype) if autocast_condition else nullcontext():
+        with torch.autocast(mm.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
             if image.shape[0] == 1:
                 if segmentor == 'video':
                     raise ValueError("Video segmentor needs more than one frame")
@@ -490,7 +491,7 @@ class Sam2VideoSegmentation:
         model.to(device)
         
         autocast_condition = not mm.is_device_mps(device)
-        with torch.autocast(mm.get_autocast_device(model.device), dtype=dtype) if autocast_condition else nullcontext(): 
+        with torch.autocast(mm.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext(): 
             
             #if hasattr(self, 'inference_state'):
             #    model.reset_state(self.inference_state)
