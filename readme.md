@@ -1,11 +1,12 @@
 # WORK IN PROGRESS
 
+PointsEditor is now available for testing in KJNodes: https://github.com/kijai/ComfyUI-KJNodes
+
+https://github.com/user-attachments/assets/c4a88647-679f-4cf2-ba1f-4fa8c7308c1e
+
 https://github.com/user-attachments/assets/f15fafe8-72e8-41cc-b246-e947b1efe5ec
 
 https://github.com/user-attachments/assets/c1efb595-0fb1-4ae7-b4fa-2def08eda0a8
-
-![image](https://github.com/user-attachments/assets/94a011f1-7553-41c0-8292-6f38bfe858f4)
-
 
 For testing only currently.
 
