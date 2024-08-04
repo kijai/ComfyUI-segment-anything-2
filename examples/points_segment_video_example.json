@@ -1,20 +1,94 @@
 {
-  "last_node_id": 113,
-  "last_link_id": 51,
+  "last_node_id": 114,
+  "last_link_id": 54,
   "nodes": [
+    {
+      "id": 106,
+      "type": "DownloadAndLoadSAM2Model",
+      "pos": [
+        451,
+        420
+      ],
+      "size": {
+        "0": 315,
+        "1": 130
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "sam2_model",
+          "type": "SAM2MODEL",
+          "links": [
+            40
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DownloadAndLoadSAM2Model"
+      },
+      "widgets_values": [
+        "sam2_hiera_base_plus.safetensors",
+        "video",
+        "cuda",
+        "bf16"
+      ]
+    },
+    {
+      "id": 112,
+      "type": "ShowText|pysssss",
+      "pos": [
+        1421,
+        -359
+      ],
+      "size": {
+        "0": 315,
+        "1": 100
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 53,
+          "widget": {
+            "name": "text"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null,
+          "shape": 6
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ShowText|pysssss"
+      },
+      "widgets_values": [
+        "",
+        "[{\"x\": 620, \"y\": 359}, {\"x\": 621, \"y\": 246}]"
+      ]
+    },
     {
       "id": 102,
       "type": "VHS_LoadVideo",
       "pos": [
-        8,
-        -57
+        14,
+        -59
       ],
       "size": [
         363.24957275390625,
         619.2495727539062
       ],
       "flags": {},
-      "order": 0,
+      "order": 1,
       "mode": 0,
       "inputs": [
         {
@@ -33,9 +107,9 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            39,
             41,
-            43
+            43,
+            52
           ],
           "shape": 3,
           "slot_index": 0
@@ -88,18 +162,77 @@
       }
     },
     {
+      "id": 113,
+      "type": "Note",
+      "pos": [
+        56,
+        -415
+      ],
+      "size": [
+        309.10654388427724,
+        177.01340377807628
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "properties": {
+        "text": ""
+      },
+      "widgets_values": [
+        "To get the image for the points editor, first create a canvas, then either input image/video (first frame is taken), or copy/paste an image while the node is selected, or drag&drop an image.\n\nWARNING: the image WILL BE SAVED to the node in compressed format, including when saving the workflow!\n\nClick the ? on the node for more information"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 107,
+      "type": "PreviewAnimation",
+      "pos": [
+        1340,
+        32
+      ],
+      "size": {
+        "0": 514.92431640625,
+        "1": 577.3973999023438
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 43
+        },
+        {
+          "name": "masks",
+          "type": "MASK",
+          "link": 42,
+          "slot_index": 1
+        }
+      ],
+      "title": "Preview Animation 16x768x768",
+      "properties": {
+        "Node name for S&R": "PreviewAnimation"
+      },
+      "widgets_values": [
+        16,
+        null
+      ]
+    },
+    {
       "id": 105,
       "type": "Sam2Segmentation",
       "pos": [
         859,
-        410
+        409
       ],
       "size": {
         "0": 315,
         "1": 170
       },
       "flags": {},
-      "order": 4,
+      "order": 5,
       "mode": 0,
       "inputs": [
         {
@@ -122,7 +255,7 @@
         {
           "name": "coordinates_positive",
           "type": "STRING",
-          "link": 44,
+          "link": 54,
           "widget": {
             "name": "coordinates_positive"
           },
@@ -159,117 +292,7 @@
       ]
     },
     {
-      "id": 106,
-      "type": "DownloadAndLoadSAM2Model",
-      "pos": [
-        451,
-        420
-      ],
-      "size": {
-        "0": 315,
-        "1": 130
-      },
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "sam2_model",
-          "type": "SAM2MODEL",
-          "links": [
-            40
-          ],
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "DownloadAndLoadSAM2Model"
-      },
-      "widgets_values": [
-        "sam2_hiera_base_plus.safetensors",
-        "video",
-        "cuda",
-        "bf16"
-      ]
-    },
-    {
-      "id": 107,
-      "type": "PreviewAnimation",
-      "pos": [
-        1326,
-        40
-      ],
-      "size": [
-        514.9242988330693,
-        577.3974097171777
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 43
-        },
-        {
-          "name": "masks",
-          "type": "MASK",
-          "link": 42,
-          "slot_index": 1
-        }
-      ],
-      "title": "Preview Animation 16x768x768",
-      "properties": {
-        "Node name for S&R": "PreviewAnimation"
-      },
-      "widgets_values": [
-        16,
-        null
-      ]
-    },
-    {
-      "id": 112,
-      "type": "ShowText|pysssss",
-      "pos": [
-        1363,
-        -241
-      ],
-      "size": [
-        315,
-        76
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "text",
-          "type": "STRING",
-          "link": 51,
-          "widget": {
-            "name": "text"
-          }
-        }
-      ],
-      "outputs": [
-        {
-          "name": "STRING",
-          "type": "STRING",
-          "links": null,
-          "shape": 6
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ShowText|pysssss"
-      },
-      "widgets_values": [
-        "",
-        "[{\"x\": 277, \"y\": 515}, {\"x\": 193, \"y\": 512}]"
-      ]
-    },
-    {
-      "id": 98,
+      "id": 114,
       "type": "PointsEditor",
       "pos": [
         432,
@@ -286,22 +309,22 @@
         {
           "name": "bg_image",
           "type": "IMAGE",
-          "link": 39
+          "link": 52
         }
       ],
       "outputs": [
         {
-          "name": "coord_str",
+          "name": "positive_coords",
           "type": "STRING",
           "links": [
-            44,
-            51
+            53,
+            54
           ],
           "shape": 3,
           "slot_index": 0
         },
         {
-          "name": "normalized_str",
+          "name": "negative_coords",
           "type": "STRING",
           "links": null,
           "shape": 3
@@ -309,22 +332,25 @@
         {
           "name": "bbox",
           "type": "BBOX",
-          "links": [],
+          "links": null,
           "shape": 3,
           "slot_index": 2
         },
         {
           "name": "bbox_mask",
           "type": "MASK",
-          "links": [],
-          "shape": 3,
-          "slot_index": 3
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "cropped_image",
+          "type": "IMAGE",
+          "links": null,
+          "shape": 3
         }
       ],
-      "title": "Points Editor 1",
       "properties": {
         "Node name for S&R": "PointsEditor",
-        "points": "PointsEditor",
         "imgData": {
           "name": "bg_image",
           "base64": [
@@ -333,51 +359,22 @@
         }
       },
       "widgets_values": [
-        "[{\"x\":276.71489999999994,\"y\":515.3631999999999},{\"x\":193.26119999999995,\"y\":512.4349999999998}]",
-        "[{\"x\":276.71489999999994,\"y\":515.3631999999999},{\"x\":193.26119999999995,\"y\":512.4349999999998}]",
-        "\"{\\\"x\\\":null,\\\"y\\\":null,\\\"width\\\":null,\\\"height\\\":null}\"",
-        "{\"x\":null,\"y\":null,\"width\":null,\"height\":null}",
+        "{\"positive\":[{\"x\":620.2460000000001,\"y\":359.37000000000006},{\"x\":620.73,\"y\":245.63000000000002}],\"negative\":[{\"x\":0,\"y\":0}]}",
+        "[{\"x\":620.2460000000001,\"y\":359.37000000000006},{\"x\":620.73,\"y\":245.63000000000002}]",
+        "[{\"x\":0,\"y\":0}]",
+        "[{}]",
+        "[{}]",
         "xyxy",
         768,
         768,
+        false,
         null,
         null,
         null
       ]
-    },
-    {
-      "id": 113,
-      "type": "Note",
-      "pos": [
-        95,
-        -343
-      ],
-      "size": [
-        275.73445802252286,
-        203.65899673835816
-      ],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "properties": {
-        "text": ""
-      },
-      "widgets_values": [
-        "To get the image for the points editor, first create a canvas, then either input image/video (first frame is taken), or copy/paste an image while the node is selected, or drag&drop an image.\n\nWARNING: the image WILL BE SAVED to the node in compressed format, including when saving the workflow!\n\nClick the ? on the node for more information."
-      ],
-      "color": "#432",
-      "bgcolor": "#653"
     }
   ],
   "links": [
-    [
-      39,
-      102,
-      0,
-      98,
-      0,
-      "IMAGE"
-    ],
     [
       40,
       106,
@@ -411,19 +408,27 @@
       "IMAGE"
     ],
     [
-      44,
-      98,
+      52,
+      102,
       0,
-      105,
-      3,
-      "STRING"
+      114,
+      0,
+      "IMAGE"
     ],
     [
-      51,
-      98,
+      53,
+      114,
       0,
       112,
       0,
+      "STRING"
+    ],
+    [
+      54,
+      114,
+      0,
+      105,
+      3,
       "STRING"
     ]
   ],
@@ -433,8 +438,8 @@
     "ds": {
       "scale": 0.7513148009015777,
       "offset": {
-        "0": 153.12488548333658,
-        "1": 641.4616902733605
+        "0": 226.08052057760656,
+        "1": 820.3321624947772
       }
     }
   },

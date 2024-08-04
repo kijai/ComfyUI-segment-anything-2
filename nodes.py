@@ -205,8 +205,12 @@ class Sam2Segmentation:
                 negative_point_coords = np.array(coordinates_negative)
                 # Ensure both positive and negative coords are lists of 2D arrays if individual_objects is True
                 if individual_objects:
+                    assert negative_point_coords.shape[0] <= positive_point_coords.shape[0], "Can't have more negative than positive points in individual_objects mode"
                     if negative_point_coords.ndim == 2:
                         negative_point_coords = negative_point_coords[:, np.newaxis, :]
+                    # Extend negative coordinates to match the number of positive coordinates
+                    while negative_point_coords.shape[0] < positive_point_coords.shape[0]:
+                        negative_point_coords = np.concatenate((negative_point_coords, negative_point_coords[:1, :, :]), axis=0)
                     final_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=1)
                 else:
                     final_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=0)
@@ -549,7 +553,6 @@ class Sam2AutoSegmentation:
                 "use_m2m": ("BOOLEAN", {"default": False}),
                 "keep_model_loaded": ("BOOLEAN", {"default": True}),
             },
-           
         }
     
     RETURN_TYPES = ("MASK", "IMAGE", "BBOX",)
