@@ -297,6 +297,7 @@ class Sam2Segmentation:
                     else:
                         if len(image_np) > 1:
                             input_box = final_box[i]
+                        input_box = final_box
                     
                     out_masks, scores, logits = model.predict(
                         point_coords=final_coords if coordinates_positive is not None else None, 
