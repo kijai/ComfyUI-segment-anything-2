@@ -1,9 +1,11 @@
 import torch
+from torch.functional import F
 import os
 import numpy as np
 import json
 import random
 
+from tqdm import tqdm
 from contextlib import nullcontext
 
 from .load_model import load_model
@@ -95,7 +97,9 @@ class Florence2toCoordinates:
             "required": {
                 "data": ("JSON", ),
                 "index": ("STRING", {"default": "0"}),
+                "batch": ("BOOLEAN", {"default": False}),
             },
+            
         }
     
     RETURN_TYPES = ("STRING", "BBOX")
@@ -103,7 +107,7 @@ class Florence2toCoordinates:
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
-    def segment(self, data, index):
+    def segment(self, data, index, batch=False):
         print(data)
         try:
             coordinates = coordinates.replace("'", '"')
@@ -124,17 +128,27 @@ class Florence2toCoordinates:
         print("Indexes:", indexes)
         bboxes = []
         
-        for idx in indexes:
-            if 0 <= idx < len(data[0]):
-                bbox = data[0][idx]
-                #print(f"Processing bbox at index {idx}: {bbox}")
-                min_x, min_y, max_x, max_y = bbox
-                center_x = int((min_x + max_x) / 2)
-                center_y = int((min_y + max_y) / 2)
-                center_points.append({"x": center_x, "y": center_y})
-                bboxes.append(bbox)
-            else:
-                raise ValueError(f"There's nothing in index: {idx}")
+        if batch:
+            for idx in indexes:
+                if 0 <= idx < len(data[0]):
+                    for i in range(len(data)):
+                        bbox = data[i][idx]
+                        min_x, min_y, max_x, max_y = bbox
+                        center_x = int((min_x + max_x) / 2)
+                        center_y = int((min_y + max_y) / 2)
+                        center_points.append({"x": center_x, "y": center_y})
+                        bboxes.append(bbox)
+        else:
+            for idx in indexes:
+                if 0 <= idx < len(data[0]):
+                    bbox = data[0][idx]
+                    min_x, min_y, max_x, max_y = bbox
+                    center_x = int((min_x + max_x) / 2)
+                    center_y = int((min_y + max_y) / 2)
+                    center_points.append({"x": center_x, "y": center_y})
+                    bboxes.append(bbox)
+                else:
+                    raise ValueError(f"There's nothing in index: {idx}")
                 
         coordinates = json.dumps(center_points)
         print("Coordinates:", coordinates)
@@ -154,6 +168,7 @@ class Sam2Segmentation:
                 "coordinates_negative": ("STRING", {"forceInput": True}),
                 "bboxes": ("BBOX", ),
                 "individual_objects": ("BOOLEAN", {"default": False}),
+                "mask": ("MASK", ),
                 
             },
         }
@@ -163,19 +178,24 @@ class Sam2Segmentation:
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
-    def segment(self, image, sam2_model, keep_model_loaded, coordinates_positive=None, coordinates_negative=None, individual_objects=False, bboxes=None):
+    def segment(self, image, sam2_model, keep_model_loaded, coordinates_positive=None, coordinates_negative=None, 
+                individual_objects=False, bboxes=None, mask=None):
         offload_device = mm.unet_offload_device()
         model = sam2_model["model"]
         device = sam2_model["device"]
         dtype = sam2_model["dtype"]
         segmentor = sam2_model["segmentor"]
         B, H, W, C = image.shape
-        image_np = (image[0].contiguous() * 255).byte().numpy()
+        
+        if mask is not None:
+            input_mask = mask.clone().unsqueeze(1)
+            input_mask = F.interpolate(input_mask, size=(256, 256), mode="bilinear")
+            input_mask = input_mask.squeeze(1)
 
         if segmentor == 'automaskgenerator':
             raise ValueError("For automaskgenerator use Sam2AutoMaskSegmentation -node")
         if segmentor == 'single_image' and B > 1:
-            raise ValueError("Use video segmentor for multiple frames")
+            print("Segmenting batch of images with single_image segmentor")
 
         if segmentor == 'video' and bboxes is not None:
             raise ValueError("Video segmentor doesn't support bboxes")
@@ -266,33 +286,44 @@ class Sam2Segmentation:
         
         autocast_condition = not mm.is_device_mps(device)
         with torch.autocast(mm.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
-            if image.shape[0] == 1:
-                if segmentor == 'video':
-                    raise ValueError("Video segmentor needs more than one frame")
-                model.set_image(image_np) 
-                masks, scores, logits = model.predict(
-                    point_coords=final_coords if coordinates_positive is not None else None, 
-                    point_labels=final_labels,
-                    box=final_box if bboxes is not None else None,
-                    multimask_output=True if not individual_objects else False,
-                    )
-               
-                if masks.ndim == 3:
-                    sorted_ind = np.argsort(scores)[::-1]
-                    masks = masks[sorted_ind][0] #choose only the best result for now
-                    scores = scores[sorted_ind]
-                    logits = logits[sorted_ind]
-                    mask_list.append(np.expand_dims(masks, axis=0))
-                else:
-                    _, _, H, W = masks.shape
-                    # Combine masks for all object IDs in the frame
-                    combined_mask = np.zeros((H, W), dtype=bool)
-                    for mask in masks:
-                        combined_mask = np.logical_or(combined_mask, mask)
-                    combined_mask = combined_mask.astype(np.uint8)
-                    mask_list.append(combined_mask)
+            if segmentor == 'single_image':
+                image_np = (image.contiguous() * 255).byte().numpy()
+                comfy_pbar = ProgressBar(len(image_np))
+                tqdm_pbar = tqdm(total=len(image_np), desc="Processing Images")
+                for i in range(len(image_np)):
+                    model.set_image(image_np[i])
+                    if bboxes is None:
+                        input_box = None
+                    else:
+                        if len(image_np) > 1:
+                            input_box = final_box[i]
+                    
+                    out_masks, scores, logits = model.predict(
+                        point_coords=final_coords if coordinates_positive is not None else None, 
+                        point_labels=final_labels if coordinates_positive is not None else None,
+                        box=input_box,
+                        multimask_output=True if not individual_objects else False,
+                        mask_input = input_mask[i].unsqueeze(0) if mask is not None else None,
+                        )
+                
+                    if out_masks.ndim == 3:
+                        sorted_ind = np.argsort(scores)[::-1]
+                        out_masks = out_masks[sorted_ind][0] #choose only the best result for now
+                        scores = scores[sorted_ind]
+                        logits = logits[sorted_ind]
+                        mask_list.append(np.expand_dims(out_masks, axis=0))
+                    else:
+                        _, _, H, W = out_masks.shape
+                        # Combine masks for all object IDs in the frame
+                        combined_mask = np.zeros((H, W), dtype=bool)
+                        for out_mask in out_masks:
+                            combined_mask = np.logical_or(combined_mask, out_mask)
+                        combined_mask = combined_mask.astype(np.uint8)
+                        mask_list.append(combined_mask)
+                    comfy_pbar.update(1)
+                    tqdm_pbar.update(1)
 
-            else:
+            elif segmentor == 'video':
                 mask_list = []
                 if hasattr(self, 'inference_state'):
                     model.reset_state(self.inference_state)
