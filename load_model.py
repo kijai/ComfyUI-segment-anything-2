@@ -41,14 +41,9 @@ def load_model(model_path, model_cfg_path, segmentor, dtype, device):
         fpn_interp_model=neck_config['fpn_interp_model']
     )
 
-    trunk = Hiera(
-        embed_dim=trunk_config['embed_dim'],
-        num_heads=trunk_config['num_heads'],
-        stages=trunk_config['stages'],
-        global_att_blocks=trunk_config['global_att_blocks'],
-        window_pos_embed_bkg_spatial_size=trunk_config['window_pos_embed_bkg_spatial_size']
-
-    )
+    keys_to_include = ['embed_dim', 'num_heads', 'global_att_blocks', 'window_pos_embed_bkg_spatial_size', 'stages']
+    trunk_kwargs = {key: trunk_config[key] for key in keys_to_include if key in trunk_config}
+    trunk = Hiera(**trunk_kwargs)
 
     image_encoder = ImageEncoder(
         scalp=model_config['image_encoder']['scalp'],
@@ -169,6 +164,9 @@ def load_model(model_path, model_cfg_path, segmentor, dtype, device):
             multimask_min_pt_num=model_config['multimask_min_pt_num'],
             multimask_max_pt_num=model_config['multimask_max_pt_num'],
             use_mlp_for_obj_ptr_proj=model_config['use_mlp_for_obj_ptr_proj'],
+            proj_tpos_enc_in_obj_ptrs=model_config['proj_tpos_enc_in_obj_ptrs'],
+            no_obj_embed_spatial=model_config['no_obj_embed_spatial'],
+            use_signed_tpos_enc_to_obj_ptrs=model_config['use_signed_tpos_enc_to_obj_ptrs'],
             binarize_mask_from_pts_for_mem_enc=True if segmentor == 'video' else False,
         ).to(dtype).to(device).eval()
 

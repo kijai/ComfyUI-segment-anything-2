@@ -25,6 +25,10 @@ class DownloadAndLoadSAM2Model:
                     'sam2_hiera_large.safetensors',
                     'sam2_hiera_small.safetensors',
                     'sam2_hiera_tiny.safetensors',
+                    'sam2.1_hiera_base_plus.safetensors',
+                    'sam2.1_hiera_large.safetensors',
+                    'sam2.1_hiera_small.safetensors',
+                    'sam2.1_hiera_tiny.safetensors',
                     ],),
             "segmentor": (
                     ['single_image','video', 'automaskgenerator'],
@@ -32,7 +36,7 @@ class DownloadAndLoadSAM2Model:
             "device": (['cuda', 'cpu', 'mps'], ),
             "precision": ([ 'fp16','bf16','fp32'],
                     {
-                    "default": 'bf16'
+                    "default": 'fp16'
                     }),
 
             },
@@ -56,7 +60,11 @@ class DownloadAndLoadSAM2Model:
         device = {"cuda": torch.device("cuda"), "cpu": torch.device("cpu"), "mps": torch.device("mps")}[device]
 
         download_path = os.path.join(folder_paths.models_dir, "sam2")
+        if precision != 'fp32' and "2.1" in model:
+            base_name, extension = model.rsplit('.', 1)
+            model = f"{base_name}-fp16.{extension}"
         model_path = os.path.join(download_path, model)
+        print("model_path: ", model_path)
         
         if not os.path.exists(model_path):
             print(f"Downloading SAM2 model to: {model_path}")
@@ -67,24 +75,36 @@ class DownloadAndLoadSAM2Model:
                             local_dir_use_symlinks=False)
 
         model_mapping = {
-            "base": "sam2_hiera_b+.yaml",
-            "large": "sam2_hiera_l.yaml",
-            "small": "sam2_hiera_s.yaml",
-            "tiny": "sam2_hiera_t.yaml"
+            "2.0": {
+                "base": "sam2_hiera_b+.yaml",
+                "large": "sam2_hiera_l.yaml",
+                "small": "sam2_hiera_s.yaml",
+                "tiny": "sam2_hiera_t.yaml"
+            },
+            "2.1": {
+                "base": "sam2.1_hiera_b+.yaml",
+                "large": "sam2.1_hiera_l.yaml",
+                "small": "sam2.1_hiera_s.yaml",
+                "tiny": "sam2.1_hiera_t.yaml"
+            }
         }
+        version = "2.1" if "2.1" in model else "2.0"
 
         model_cfg_path = next(
-            (os.path.join(script_directory, "sam2_configs", cfg) for key, cfg in model_mapping.items() if key in model),
+            (os.path.join(script_directory, "sam2_configs", cfg) 
+            for key, cfg in model_mapping[version].items() if key in model),
             None
-            )
+        )
+        print(f"Using model config: {model_cfg_path}")
 
-        model =load_model(model_path, model_cfg_path, segmentor, dtype, device)
+        model = load_model(model_path, model_cfg_path, segmentor, dtype, device)
         
         sam2_model = {
             'model': model, 
             'dtype': dtype,
             'device': device,
-            'segmentor' : segmentor
+            'segmentor' : segmentor,
+            'version': version
             }
 
         return (sam2_model,)
@@ -197,8 +217,8 @@ class Sam2Segmentation:
         if segmentor == 'single_image' and B > 1:
             print("Segmenting batch of images with single_image segmentor")
 
-        if segmentor == 'video' and bboxes is not None:
-            raise ValueError("Video segmentor doesn't support bboxes")
+        if segmentor == 'video' and bboxes is not None and "2.1" not in sam2_model["version"]:
+            raise ValueError("2.0 model doesn't support bboxes with video segmentor")
 
         if segmentor == 'video': # video model needs images resized first thing
             model_input_image_size = model.image_size
@@ -329,23 +349,35 @@ class Sam2Segmentation:
                 if hasattr(self, 'inference_state'):
                     model.reset_state(self.inference_state)
                 self.inference_state = model.init_state(image.permute(0, 3, 1, 2).contiguous(), H, W, device=device)
+                if bboxes is None:
+                        input_box = None
+                else:
+                    input_box = bboxes[0]
                 
+                if individual_objects and bboxes is not None:
+                    raise ValueError("bboxes not supported with individual_objects")
+
+
                 if individual_objects:
                     for i, (coord, label) in enumerate(zip(final_coords, final_labels)):
-                        _, out_obj_ids, out_mask_logits = model.add_new_points(
+                        _, out_obj_ids, out_mask_logits = model.add_new_points_or_box(
                         inference_state=self.inference_state,
                         frame_idx=0,
                         obj_id=i,
                         points=final_coords[i],
                         labels=final_labels[i],
+                        clear_old_points=True,
+                        box=input_box
                         )
                 else:
-                    _, out_obj_ids, out_mask_logits = model.add_new_points(
+                    _, out_obj_ids, out_mask_logits = model.add_new_points_or_box(
                         inference_state=self.inference_state,
                         frame_idx=0,
                         obj_id=1,
-                        points=final_coords,
-                        labels=final_labels,
+                        points=final_coords if coordinates_positive is not None else None, 
+                        labels=final_labels if coordinates_positive is not None else None,
+                        clear_old_points=True,
+                        box=input_box
                     )
 
                 pbar = ProgressBar(B)
@@ -673,6 +705,48 @@ class Sam2AutoSegmentation:
         
         mask_tensor = torch.stack(out_list, dim=0)
         return (mask_tensor.cpu().float(), segment_image_tensor.cpu().float(), bbox_list)
+
+#WIP    
+# class OwlV2Detector:
+#     @classmethod
+#     def INPUT_TYPES(s):
+#         return {
+#             "required": {
+#                 "image": ("IMAGE", ),
+#             },
+#         }
+    
+#     RETURN_TYPES = ("MASK", )
+#     RETURN_NAMES =("mask", )
+#     FUNCTION = "segment"
+#     CATEGORY = "SAM2"
+
+#     def segment(self, image):
+#         from transformers import Owlv2Processor, Owlv2ForObjectDetection
+#         device = mm.get_torch_device()
+#         offload_device = mm.unet_offload_device()
+#         processor = Owlv2Processor.from_pretrained("google/owlv2-base-patch16-ensemble")
+#         model = Owlv2ForObjectDetection.from_pretrained("google/owlv2-base-patch16-ensemble")
+
+#         url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+#         image = Image.open(requests.get(url, stream=True).raw)
+#         texts = [["a photo of a cat", "a photo of a dog"]]
+#         inputs = processor(text=texts, images=image, return_tensors="pt")
+#         outputs = model(**inputs)
+
+#         # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
+#         target_sizes = torch.Tensor([image.size[::-1]])
+#         # Convert outputs (bounding boxes and class logits) to Pascal VOC Format (xmin, ymin, xmax, ymax)
+#         results = processor.post_process_object_detection(outputs=outputs, target_sizes=target_sizes, threshold=0.1)
+#         i = 0  # Retrieve predictions for the first image for the corresponding text queries
+#         text = texts[i]
+#         boxes, scores, labels = results[i]["boxes"], results[i]["scores"], results[i]["labels"]
+#         for box, score, label in zip(boxes, scores, labels):
+#             box = [round(i, 2) for i in box.tolist()]
+#             print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
+
+
+#         return (mask_tensor,)
      
 NODE_CLASS_MAPPINGS = {
     "DownloadAndLoadSAM2Model": DownloadAndLoadSAM2Model,
