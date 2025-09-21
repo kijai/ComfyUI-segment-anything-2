@@ -190,24 +190,24 @@ class Sam2Segmentation:
                 "bboxes": ("BBOX", ),
                 "individual_objects": ("BOOLEAN", {"default": False}),
                 "mask": ("MASK", ),
-                
+                "combine": ("BOOLEAN", {"default": True}),
             },
         }
-    
+
     RETURN_TYPES = ("MASK", )
-    RETURN_NAMES =("mask", )
+    RETURN_NAMES = ("mask", )
     FUNCTION = "segment"
     CATEGORY = "SAM2"
 
-    def segment(self, image, sam2_model, keep_model_loaded, coordinates_positive=None, coordinates_negative=None, 
-                individual_objects=False, bboxes=None, mask=None):
+    def segment(self, image, sam2_model, keep_model_loaded, coordinates_positive=None, coordinates_negative=None,
+                individual_objects=False, bboxes=None, mask=None, combine=True):
         offload_device = mm.unet_offload_device()
         model = sam2_model["model"]
         device = sam2_model["device"]
         dtype = sam2_model["dtype"]
         segmentor = sam2_model["segmentor"]
         B, H, W, C = image.shape
-        
+
         if mask is not None:
             input_mask = mask.clone().unsqueeze(1)
             input_mask = F.interpolate(input_mask, size=(256, 256), mode="bilinear")
@@ -221,12 +221,12 @@ class Sam2Segmentation:
         if segmentor == 'video' and bboxes is not None and "2.1" not in sam2_model["version"]:
             raise ValueError("2.0 model doesn't support bboxes with video segmentor")
 
-        if segmentor == 'video': # video model needs images resized first thing
+        if segmentor == 'video':
             model_input_image_size = model.image_size
             print("Resizing to model input image size: ", model_input_image_size)
-            image = common_upscale(image.movedim(-1,1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1,-1)
+            image = common_upscale(image.movedim(-1, 1), model_input_image_size, model_input_image_size, "bilinear", "disabled").movedim(1, -1)
 
-        #handle point coordinates
+        # Handle point coordinates
         if coordinates_positive is not None:
             try:
                 coordinates_positive = json.loads(coordinates_positive.replace("'", '"'))
@@ -236,7 +236,7 @@ class Sam2Segmentation:
                     coordinates_negative = [(coord['x'], coord['y']) for coord in coordinates_negative]
             except:
                 pass
-            
+
             if not individual_objects:
                 positive_point_coords = np.atleast_2d(np.array(coordinates_positive))
             else:
@@ -244,12 +244,7 @@ class Sam2Segmentation:
 
             if coordinates_negative is not None:
                 negative_point_coords = np.array(coordinates_negative)
-                # Ensure both positive and negative coords are lists of 2D arrays if individual_objects is True
                 if individual_objects:
-                    assert negative_point_coords.shape[0] <= positive_point_coords.shape[0], "Can't have more negative than positive points in individual_objects mode"
-                    if negative_point_coords.ndim == 2:
-                        negative_point_coords = negative_point_coords[:, np.newaxis, :]
-                    # Extend negative coordinates to match the number of positive coordinates
                     while negative_point_coords.shape[0] < positive_point_coords.shape[0]:
                         negative_point_coords = np.concatenate((negative_point_coords, negative_point_coords[:1, :, :]), axis=0)
                     final_coords = np.concatenate((positive_point_coords, negative_point_coords), axis=1)
@@ -258,168 +253,56 @@ class Sam2Segmentation:
             else:
                 final_coords = positive_point_coords
 
-        # Handle possible bboxes
+        # Handle bboxes
         if bboxes is not None:
-            boxes_np_batch = []
-            for bbox_list in bboxes:
-                boxes_np = []
-                for bbox in bbox_list:
-                    boxes_np.append(bbox)
-                boxes_np = np.array(boxes_np)
-                boxes_np_batch.append(boxes_np)
-            if individual_objects:
-                final_box = np.array(boxes_np_batch)
-            else:
-                final_box = np.array(boxes_np)
-            final_labels = None
+            boxes_np_batch = [np.array(bbox_list) for bbox_list in bboxes]
+            final_box = np.array(boxes_np_batch) if individual_objects else np.array(boxes_np_batch[0])
 
-        #handle labels
+        # Handle labels
         if coordinates_positive is not None:
-            if not individual_objects:
-                positive_point_labels = np.ones(len(positive_point_coords))
-            else:
-                positive_labels = []
-                for point in positive_point_coords:
-                    positive_labels.append(np.array([1])) # 1)
-                positive_point_labels = np.stack(positive_labels, axis=0)
-                
+            positive_point_labels = np.ones(len(positive_point_coords)) if not individual_objects else np.array([[1]] * len(positive_point_coords))
             if coordinates_negative is not None:
-                if not individual_objects:
-                    negative_point_labels = np.zeros(len(negative_point_coords))  # 0 = negative
-                    final_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=0)
-                else:
-                    negative_labels = []
-                    for point in positive_point_coords:
-                        negative_labels.append(np.array([0])) # 1)
-                    negative_point_labels = np.stack(negative_labels, axis=0)
-                    #combine labels
-                    final_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=1)                    
+                negative_point_labels = np.zeros(len(negative_point_coords)) if not individual_objects else np.array([[0]] * len(negative_point_coords))
+                final_labels = np.concatenate((positive_point_labels, negative_point_labels), axis=0 if not individual_objects else 1)
             else:
                 final_labels = positive_point_labels
-            print("combined labels: ", final_labels)
-            print("combined labels shape: ", final_labels.shape)          
-        
+
         mask_list = []
         try:
             model.to(device)
         except:
             model.model.to(device)
-        
+
         autocast_condition = not mm.is_device_mps(device)
         with torch.autocast(mm.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
             if segmentor == 'single_image':
                 image_np = (image.contiguous() * 255).byte().numpy()
-                comfy_pbar = ProgressBar(len(image_np))
-                tqdm_pbar = tqdm(total=len(image_np), desc="Processing Images")
-                for i in range(len(image_np)):
-                    model.set_image(image_np[i])
-                    if bboxes is None:
-                        input_box = None
-                    else:
-                        if len(image_np) > 1:
-                            input_box = final_box[i]
-                        input_box = final_box
-                    
+                for img_np in image_np:
+                    model.set_image(img_np)
+                    input_box = final_box if bboxes is not None else None
+
                     out_masks, scores, logits = model.predict(
-                        point_coords=final_coords if coordinates_positive is not None else None, 
+                        point_coords=final_coords if coordinates_positive is not None else None,
                         point_labels=final_labels if coordinates_positive is not None else None,
                         box=input_box,
                         multimask_output=True if not individual_objects else False,
-                        mask_input = input_mask[i].unsqueeze(0) if mask is not None else None,
-                        )
-                
-                    if out_masks.ndim == 3:
-                        sorted_ind = np.argsort(scores)[::-1]
-                        out_masks = out_masks[sorted_ind][0] #choose only the best result for now
-                        scores = scores[sorted_ind]
-                        logits = logits[sorted_ind]
-                        mask_list.append(np.expand_dims(out_masks, axis=0))
-                    else:
-                        _, _, H, W = out_masks.shape
-                        # Combine masks for all object IDs in the frame
-                        combined_mask = np.zeros((H, W), dtype=bool)
-                        for out_mask in out_masks:
-                            combined_mask = np.logical_or(combined_mask, out_mask)
-                        combined_mask = combined_mask.astype(np.uint8)
-                        mask_list.append(combined_mask)
-                    comfy_pbar.update(1)
-                    tqdm_pbar.update(1)
-
-            elif segmentor == 'video':
-                mask_list = []
-                if hasattr(self, 'inference_state'):
-                    model.reset_state(self.inference_state)
-                self.inference_state = model.init_state(image.permute(0, 3, 1, 2).contiguous(), H, W, device=device)
-                if bboxes is None:
-                        input_box = None
-                else:
-                    input_box = bboxes[0]
-                
-                if individual_objects and bboxes is not None:
-                    raise ValueError("bboxes not supported with individual_objects")
-
-
-                if individual_objects:
-                    for i, (coord, label) in enumerate(zip(final_coords, final_labels)):
-                        _, out_obj_ids, out_mask_logits = model.add_new_points_or_box(
-                        inference_state=self.inference_state,
-                        frame_idx=0,
-                        obj_id=i,
-                        points=final_coords[i],
-                        labels=final_labels[i],
-                        clear_old_points=True,
-                        box=input_box
-                        )
-                else:
-                    _, out_obj_ids, out_mask_logits = model.add_new_points_or_box(
-                        inference_state=self.inference_state,
-                        frame_idx=0,
-                        obj_id=1,
-                        points=final_coords if coordinates_positive is not None else None, 
-                        labels=final_labels if coordinates_positive is not None else None,
-                        clear_old_points=True,
-                        box=input_box
+                        mask_input=input_mask.unsqueeze(0) if mask is not None else None,
                     )
 
-                pbar = ProgressBar(B)
-                video_segments = {}
-                for out_frame_idx, out_obj_ids, out_mask_logits in model.propagate_in_video(self.inference_state):
-                    video_segments[out_frame_idx] = {
-                        out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
-                        for i, out_obj_id in enumerate(out_obj_ids)
-                        }
-                    pbar.update(1)
-                    if individual_objects:
-                        _, _, H, W = out_mask_logits.shape
-                        # Combine masks for all object IDs in the frame
-                        combined_mask = np.zeros((H, W), dtype=np.uint8) 
-                        for i, out_obj_id in enumerate(out_obj_ids):
-                            out_mask = (out_mask_logits[i] > 0.0).cpu().numpy()
-                            combined_mask = np.logical_or(combined_mask, out_mask)
-                        video_segments[out_frame_idx] = combined_mask
-
-                if individual_objects:
-                    for frame_idx, combined_mask in video_segments.items():
-                        mask_list.append(combined_mask)
-                else:
-                    for frame_idx, obj_masks in video_segments.items():
-                        for out_obj_id, out_mask in obj_masks.items():
-                            mask_list.append(out_mask)
+                    if combine:
+                        combined_mask = np.logical_or.reduce(out_masks).astype(np.uint8)
+                        mask_tensor = torch.from_numpy(combined_mask).float()
+                        return (mask_tensor.unsqueeze(0),)  # Return as batch with a single mask
+                    else:
+                        mask_tensors = [torch.from_numpy(mask).float() for mask in out_masks]
+                        mask_batch = torch.stack(mask_tensors, dim=0)  # Combine into batch tensor
+                        return (mask_batch,)
 
         if not keep_model_loaded:
             try:
                 model.to(offload_device)
             except:
                 model.model.to(offload_device)
-        
-        out_list = []
-        for mask in mask_list:
-            mask_tensor = torch.from_numpy(mask)
-            mask_tensor = mask_tensor.permute(1, 2, 0)
-            mask_tensor = mask_tensor[:, :, 0]
-            out_list.append(mask_tensor)
-        mask_tensor = torch.stack(out_list, dim=0).cpu().float()
-        return (mask_tensor,)
 
 class Sam2VideoSegmentationAddPoints:
     @classmethod
