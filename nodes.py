@@ -53,26 +53,50 @@ class DownloadAndLoadSAM2Model:
 
         if device == "cuda":
             if torch.cuda.get_device_properties(0).major >= 8:
-                # turn on tfloat32 for Ampere GPUs (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
                 torch.backends.cuda.matmul.allow_tf32 = True
                 torch.backends.cudnn.allow_tf32 = True
         dtype = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[precision]
         device = {"cuda": torch.device("cuda"), "cpu": torch.device("cpu"), "mps": torch.device("mps")}[device]
 
-        download_path = os.path.join(folder_paths.models_dir, "sam2")
+        # Check custom model paths first, then default path
+        sam2_paths = folder_paths.get_folder_paths("sam2")
+        if not sam2_paths:
+            sam2_paths = [os.path.join(folder_paths.models_dir, "sam2")]
+
         if precision != 'fp32' and "2.1" in model:
             base_name, extension = model.rsplit('.', 1)
             model = f"{base_name}-fp16.{extension}"
-        model_path = os.path.join(download_path, model)
-        print("model_path: ", model_path)
-        
-        if not os.path.exists(model_path):
-            print(f"Downloading SAM2 model to: {model_path}")
-            from huggingface_hub import snapshot_download
-            snapshot_download(repo_id="Kijai/sam2-safetensors",
-                            allow_patterns=[f"*{model}*"],
-                            local_dir=download_path,
-                            local_dir_use_symlinks=False)
+
+        # Check all configured paths for existing model
+        model_path = None
+        for path in sam2_paths:
+            candidate_path = os.path.join(path, model)
+            if os.path.exists(candidate_path):
+                model_path = candidate_path
+                print(f"Found model at: {model_path}")
+                break
+
+        # Model not found locally, attempt download
+        if model_path is None:
+            download_dir = sam2_paths[0]  # Use first configured path for download
+            model_path = os.path.join(download_dir, model)
+            print(f"Model not found locally, attempting download to: {download_dir}")
+
+            try:
+                from huggingface_hub import snapshot_download
+                snapshot_download(
+                    repo_id="Kijai/sam2-safetensors",
+                    allow_patterns=[f"*{model}*"],
+                    local_dir=download_dir,
+                    local_dir_use_symlinks=False
+                )
+                print(f"Download successful: {model_path}")
+            except Exception as e:
+                raise FileNotFoundError(
+                    f"Model not found in any configured path and download failed: {e}\n"
+                    f"Please manually download '{model}' to: {download_dir}\n"
+                    f"Download from: https://huggingface.co/Kijai/sam2-safetensors"
+                )
 
         model_mapping = {
             "2.0": {
@@ -91,21 +115,21 @@ class DownloadAndLoadSAM2Model:
         version = "2.1" if "2.1" in model else "2.0"
 
         model_cfg_path = next(
-            (os.path.join(script_directory, "sam2_configs", cfg) 
-            for key, cfg in model_mapping[version].items() if key in model),
+            (os.path.join(script_directory, "sam2_configs", cfg)
+             for key, cfg in model_mapping[version].items() if key in model),
             None
         )
         print(f"Using model config: {model_cfg_path}")
 
         model = load_model(model_path, model_cfg_path, segmentor, dtype, device)
-        
+
         sam2_model = {
-            'model': model, 
+            'model': model,
             'dtype': dtype,
             'device': device,
-            'segmentor' : segmentor,
+            'segmentor': segmentor,
             'version': version
-            }
+        }
 
         return (sam2_model,)
 
